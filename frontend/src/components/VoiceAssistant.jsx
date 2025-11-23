@@ -1,156 +1,250 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Mic, MicOff, Activity } from "lucide-react";
+import { Mic, MicOff, Activity, Power, WifiOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMusic } from "../context/MusicContext";
 
-const VoiceAssistant = ({ 
-  onNext, 
-  onPrev, 
-  onPlay, 
-  onPause, 
-  onVolumeUp, 
-  onVolumeDown,
-  onSkip 
-}) => {
-  const [isListening, setIsListening] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false); // True when "Hey Emotify" is detected
-  const [feedback, setFeedback] = useState(""); // Text feedback to show user
-  const recognitionRef = useRef(null);
-
-  // Initialize Speech Recognition
+const VoiceAssistant = () => {
+  const music = useMusic(); 
+  
+  // 1. BRIDGE: Always keep a reference to the latest music state
+  const controlsRef = useRef(music);
   useEffect(() => {
-    // Check browser compatibility
+    controlsRef.current = music;
+  }, [music]);
+
+  // --- UI State ---
+  const [isMicrophoneOn, setIsMicrophoneOn] = useState(false); 
+  const [visualActive, setVisualActive] = useState(false); 
+  const [feedback, setFeedback] = useState(""); 
+  const [errorState, setErrorState] = useState(null);
+  
+  // --- Logic Refs ---
+  const recognitionRef = useRef(null);
+  const silenceTimer = useRef(null);
+  const isActiveRef = useRef(false); 
+  const isProcessingRef = useRef(false); 
+  const shouldBeOnRef = useRef(false); 
+
+  // --- RECOGNITION SETUP ---
+  useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Keep listening
-      recognition.interimResults = false; // Only final results
-      recognition.lang = "en-US";
+    if (!SpeechRecognition) {
+        console.error("Browser does not support Speech API");
+        return;
+    }
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => {
-        // Auto-restart if it stops (unless manually stopped)
-        if (isListening) recognition.start();
-      };
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true; 
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
 
-      recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-        console.log("Heard:", transcript);
+    recognition.onstart = () => {
+        setIsMicrophoneOn(true);
+        setErrorState(null);
+    };
 
-        // 1. Check for Wake Word
-        if (transcript.includes("hey emotify") || transcript.includes("emotify")) {
-          handleCommand(transcript);
+    recognition.onerror = (event) => {
+        if (event.error === 'network') setErrorState("network");
+        if (event.error === 'not-allowed') {
+            setErrorState("permission");
+            shouldBeOnRef.current = false;
+            setIsMicrophoneOn(false);
         }
-      };
-
-      recognitionRef.current = recognition;
-    } else {
-      console.warn("Speech Recognition not supported in this browser.");
-    }
-
-    return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
     };
-  }, [isListening]);
 
-  // Command Processor
-  const handleCommand = (text) => {
-    setIsProcessing(true);
+    recognition.onend = () => {
+        setIsMicrophoneOn(false);
+        // Smart Restart Logic
+        if (shouldBeOnRef.current) {
+            const delay = errorState === 'network' ? 2000 : 500;
+            setTimeout(() => {
+                if (shouldBeOnRef.current) {
+                    try { recognition.start(); } catch (e) {}
+                }
+            }, delay);
+        }
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      console.log("🎤 Heard:", transcript);
+      setErrorState(null);
+
+      if (!isActiveRef.current) {
+        const wakeWords = ["hey emotify", "emotify", "hey spotify", "modify", "notify", "play music"];
+        if (wakeWords.some(word => transcript.includes(word))) {
+            activateAssistant();
+        }
+      } else {
+        processCommand(transcript);
+      }
+    };
+
+    recognitionRef.current = recognition;
     
-    // Simple text-to-speech feedback
-    const speak = (msg) => {
-      const utterance = new SpeechSynthesisUtterance(msg);
-      window.speechSynthesis.speak(utterance);
-      setFeedback(msg);
-      setTimeout(() => {
-        setFeedback("");
-        setIsProcessing(false);
-      }, 3000);
+    // Cleanup
+    return () => {
+        shouldBeOnRef.current = false;
+        recognition.abort();
     };
+  }, []); 
 
-    if (text.includes("next") || text.includes("skip")) {
-      speak("Playing next song");
-      if (onNext) onNext();
-    } else if (text.includes("previous") || text.includes("back")) {
-      speak("Going back");
-      if (onPrev) onPrev();
-    } else if (text.includes("play") || text.includes("resume")) {
-      speak("Resuming music");
-      if (onPlay) onPlay();
-    } else if (text.includes("pause") || text.includes("stop")) {
-      speak("Pausing music");
-      if (onPause) onPause();
-    } else if (text.includes("volume up") || text.includes("louder") || text.includes("increase")) {
-      speak("Volume up");
-      if (onVolumeUp) onVolumeUp();
-    } else if (text.includes("volume down") || text.includes("quieter") || text.includes("decrease")) {
-      speak("Volume down");
-      if (onVolumeDown) onVolumeDown();
+  // --- VOLUME DUCKING ---
+  useEffect(() => {
+    const audio = music.audioRef.current;
+    if (!audio) return;
+
+    if (visualActive) {
+      audio.volume = 0.2; // Lower volume when listening
     } else {
-      speak("I'm listening, but didn't catch that command.");
+      // Restore volume safely
+      const safeVolume = (Number.isFinite(music.volume) && music.volume >= 0 && music.volume <= 1) ? music.volume : 1.0;
+      audio.volume = safeVolume; 
     }
+  }, [visualActive, music.volume, music.audioRef]);
+
+  // --- HELPERS ---
+  const speak = (msg) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(msg);
+    window.speechSynthesis.speak(utterance);
+    setFeedback(msg);
+    setTimeout(() => setFeedback(""), 4000);
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+  const activateAssistant = () => {
+    isActiveRef.current = true;
+    setVisualActive(true);
+    speak("I'm listening");
+    resetSilenceTimer();
+  };
+
+  // --- COMMAND PROCESSOR ---
+  const processCommand = (text) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    const controls = controlsRef.current; // Access latest controls
+    let commandFound = true;
+
+    // 1. PLAY / SEARCH LOGIC (Improved)
+    if (text.startsWith("play ")) {
+        // Remove noise words to get a clean search query
+        let query = text.replace("play", "")
+                        .replace("songs", "")
+                        .replace("song", "")
+                        .trim();
+        
+        // If query became empty, default to lofi
+        if (!query) query = "lofi";
+
+        speak(`Playing ${query}`);
+        controls.searchAndPlay(query);
+        resetToStandby(); // Sleep immediately so song can play
+    
+    // 2. NAVIGATION
+    } else if (text.includes("next") || text.includes("skip")) {
+        speak("Next");
+        controls.nextTrack();
+    } else if (text.includes("previous") || text.includes("back")) {
+        speak("Previous");
+        controls.prevTrack();
+    
+    // 3. PLAYBACK STATE
+    } else if (text.includes("stop") || text.includes("pause")) {
+        speak("Paused");
+        controls.togglePlay();
+        resetToStandby();
+    } else if (text.includes("resume") || text.includes("start")) {
+        speak("Resuming");
+        controls.togglePlay();
+        resetToStandby();
+
+    // 4. VOLUME (Immediate Sleep for Feedback)
+    } else if (text.includes("volume up") || text.includes("increase") || text.includes("louder")) {
+        controls.adjustVolume("up");
+        resetToStandby(); 
+
+    } else if (text.includes("volume down") || text.includes("decrease") || text.includes("quieter")) {
+        controls.adjustVolume("down");
+        resetToStandby(); 
+
     } else {
-      recognitionRef.current.start();
-      setIsListening(true);
+        commandFound = false;
+    }
+
+    if (commandFound && isActiveRef.current) resetSilenceTimer();
+    
+    // Unlock processing after 1s
+    setTimeout(() => { isProcessingRef.current = false; }, 1000);
+  };
+
+  const resetSilenceTimer = () => {
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    silenceTimer.current = setTimeout(() => {
+      resetToStandby();
+    }, 10000); // 10 seconds awake
+  };
+
+  const resetToStandby = () => {
+    isActiveRef.current = false;
+    setVisualActive(false); // Triggers volume restore
+    setFeedback("");
+  };
+
+  const handleToggle = () => {
+    if (!recognitionRef.current) return;
+    if (shouldBeOnRef.current) {
+        shouldBeOnRef.current = false;
+        recognitionRef.current.abort();
+        setIsMicrophoneOn(false);
+        resetToStandby();
+    } else {
+        shouldBeOnRef.current = true;
+        try { recognitionRef.current.start(); } catch(e) {}
     }
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-2">
-      {/* Feedback Bubble */}
+    <div className="fixed bottom-8 right-8 z-[9999] flex flex-col items-end gap-2">
       <AnimatePresence>
-        {(feedback || isProcessing) && (
+        {(feedback || visualActive || errorState === 'network') && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="bg-black/80 backdrop-blur-md border border-purple-500/30 text-white px-4 py-2 rounded-xl mb-2 text-sm font-medium shadow-lg"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className={`backdrop-blur-md border px-4 py-2 rounded-xl mb-2 text-sm font-medium shadow-2xl 
+              ${errorState === 'network' ? "bg-red-900/90 border-red-400 text-white" :
+               visualActive ? "bg-purple-900/90 border-purple-400 text-white" : "bg-black/80 border-gray-600 text-gray-300"}`}
           >
-            {feedback || "Listening..."}
+            {errorState === 'network' ? "Reconnecting..." : feedback || "Listening..."}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Mic Button / Orb */}
       <motion.button
+        onClick={handleToggle}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        onClick={toggleListening}
-        className={`relative w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500
-          ${isListening 
-            ? "bg-gradient-to-br from-purple-600 to-fuchsia-600 shadow-purple-500/40" 
-            : "bg-gray-800 border border-gray-700 shadow-black/50"
+        animate={{ 
+          scale: visualActive ? 1.2 : 1,
+          boxShadow: visualActive ? "0 0 30px #a855f7" : "0 0 10px rgba(0,0,0,0.5)"
+        }}
+        className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500
+          ${isMicrophoneOn
+            ? visualActive 
+                ? "bg-gradient-to-br from-purple-600 to-pink-600 border-2 border-white/20" 
+                : "bg-gray-800 border-2 border-purple-500/50"
+            : "bg-red-900/80 border-2 border-red-500/50"
           }`}
       >
-        {/* Pulsing Rings when Active */}
-        {isListening && (
-          <>
-            <motion.div
-              animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-              transition={{ repeat: Infinity, duration: 2 }}
-              className="absolute inset-0 bg-purple-500 rounded-full z-0"
-            />
-            <motion.div
-              animate={{ scale: [1, 2], opacity: [0.3, 0] }}
-              transition={{ repeat: Infinity, duration: 2, delay: 0.5 }}
-              className="absolute inset-0 bg-fuchsia-500 rounded-full z-0"
-            />
-          </>
+        {visualActive && (
+           <span className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping"></span>
         )}
-
-        {/* Icon */}
         <div className="relative z-10">
-           {isListening ? (
-             isProcessing ? <Activity className="text-white animate-pulse" /> : <Mic className="text-white" />
-           ) : (
-             <MicOff className="text-gray-400" />
-           )}
+           {errorState === 'network' ? <WifiOff className="text-white animate-pulse" /> : 
+            !isMicrophoneOn ? <Power className="text-red-200" /> : 
+            visualActive ? <Activity className="text-white animate-bounce" /> : <Mic className="text-purple-200" />}
         </div>
       </motion.button>
     </div>

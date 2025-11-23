@@ -12,9 +12,9 @@ router.get("/suggestions", async (req, res) => {
   const options = {
     method: "GET",
     hostname: "spotify23.p.rapidapi.com",
-    path: "/track_lyrics/?id=4snRyiaLyvTMui0hzp8MF7", // You can make this dynamic via query later
+    path: `/track_lyrics/?id=${req.query.songId}`, // You can make this dynamic via query later
     headers: {
-      "x-rapidapi-key": '3c0c4e7f51msh8d207356aba435fp15ff0fjsnb887eb6dbc2d',
+      "x-rapidapi-key": process.env.RAPIDAPI_KEY,
       "x-rapidapi-host": "spotify23.p.rapidapi.com",
     },
   };

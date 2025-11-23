@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion, AnimatePresence, useSpring } from "framer-motion";
 import { Loader2, Mail, Lock, ArrowRight, LogIn } from "lucide-react";
-// import { useAuth } from "../context/AuthProvider"; // Commented out to prevent build error in preview
+// import { useAuth } from "../context/AuthProvider"; 
 
 // --- Premium Styles ---
 const PremiumStyles = () => (
@@ -47,7 +47,7 @@ const PremiumStyles = () => (
 
 export default function Login() {
   const navigate = useNavigate();
-  // const { login } = useAuth(); // Removed for preview stability
+  // const { login } = useAuth(); 
   
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [status, setStatus] = useState("idle"); 
@@ -87,18 +87,19 @@ export default function Login() {
 
       setStatus("success");
 
-      // 2. Save Data (Directly to localStorage for reliability)
+      // 2. Save Data
       const { user, token } = res.data;
       
       localStorage.setItem("token", token);
       localStorage.setItem("User", JSON.stringify(user));
       
-      // Dispatch a custom event so other components (like Navbar) know auth changed
+      // Dispatch event for Navbar
       window.dispatchEvent(new Event("storage"));
 
-      // 3. Redirect
+      // 3. Redirect (FIXED: Using location.href to force re-check of auth state)
       setTimeout(() => {
-        navigate("/dashboard");
+        // navigate("/dashboard"); <-- Replaced this
+        window.location.href = "/dashboard"; 
       }, 1000);
 
     } catch (err) {

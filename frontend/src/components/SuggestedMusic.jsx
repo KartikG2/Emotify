@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Play, Pause, Search, Disc, Music, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMusic } from "../context/MusicContext"; // <--- 1. IMPORT THE GLOBAL BRAIN
 
 // --- Premium Styles ---
 const PremiumStyles = () => (
@@ -53,9 +54,10 @@ const PremiumStyles = () => (
 const SuggestedMusic = ({ query }) => {
   const [songs, setSongs] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [playingUrl, setPlayingUrl] = useState(null);
   const [loading, setLoading] = useState(false);
-  const audioRef = useRef(null);
+  
+  // 2. USE GLOBAL HOOKS (This connects Dashboard to the Global Bar & Voice AI)
+  const { playTrack, currentTrack, isPlaying } = useMusic();
 
   // --- Fetch Logic ---
   const fetchSongs = async (searchQuery) => {
@@ -63,10 +65,9 @@ const SuggestedMusic = ({ query }) => {
     setLoading(true);
     try {
       const res = await fetch(
-        `https://v1.nocodeapi.com/satyam88singh/spotify/ydfAheeOBfBczwCO/search?q=${searchQuery}&type=track`
+        `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${searchQuery}&type=track`
       );
       const data = await res.json();
-      // Filter out tracks without preview URLs
       const validSongs = (data.tracks?.items || []).filter(song => song.preview_url);
       setSongs(validSongs);
     } catch (err) {
@@ -79,26 +80,12 @@ const SuggestedMusic = ({ query }) => {
   // --- Effects ---
   useEffect(() => {
     if (query) {
-      setSearchTerm(query); // Update search bar text to match query
+      setSearchTerm(query);
       fetchSongs(query);
     }
   }, [query]);
 
   // --- Handlers ---
-  const handlePlay = (url) => {
-    const audio = audioRef.current;
-    if (!url || !audio) return;
-
-    if (playingUrl === url) {
-      audio.pause();
-      setPlayingUrl(null);
-    } else {
-      audio.src = url;
-      audio.play().catch((err) => console.error("Playback error:", err));
-      setPlayingUrl(url);
-    }
-  };
-
   const handleManualSearch = (e) => {
     e.preventDefault();
     fetchSongs(searchTerm);
@@ -108,7 +95,7 @@ const SuggestedMusic = ({ query }) => {
     <div className="w-full text-white font-body">
       <PremiumStyles />
 
-      {/* --- Header Section --- */}
+      {/* --- Header Section (Search Bar) --- */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-10">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-mono text-purple-400 mb-2 uppercase tracking-widest">
@@ -156,7 +143,10 @@ const SuggestedMusic = ({ query }) => {
           <AnimatePresence>
             {songs.length > 0 ? (
               songs.map((track, index) => {
-                const isPlaying = playingUrl === track.preview_url;
+                
+                // 3. GLOBAL CHECK: Is *this* song playing in the Global Context?
+                const isCurrentSong = currentTrack?.preview_url === track.preview_url;
+                const isActive = isCurrentSong && isPlaying;
 
                 return (
                   <motion.div
@@ -167,9 +157,10 @@ const SuggestedMusic = ({ query }) => {
                     transition={{ delay: index * 0.05 }}
                     whileHover={{ y: -8 }}
                     className={`glass-panel p-4 rounded-[1.5rem] group cursor-pointer transition-all duration-300 ${
-                      isPlaying ? "border-purple-500/50 bg-purple-500/5" : "hover:border-white/20 hover:bg-white/5"
+                      isCurrentSong ? "border-purple-500/50 bg-purple-500/5" : "hover:border-white/20 hover:bg-white/5"
                     }`}
-                    onClick={() => handlePlay(track.preview_url)}
+                    // 4. CRITICAL: Use GLOBAL playTrack, NOT local audio
+                    onClick={() => playTrack(track)} 
                   >
                     {/* Album Art */}
                     <div className="relative aspect-square rounded-2xl overflow-hidden mb-4 shadow-2xl">
@@ -177,16 +168,16 @@ const SuggestedMusic = ({ query }) => {
                         src={track.album.images[0]?.url}
                         alt={track.name}
                         className={`w-full h-full object-cover transition-transform duration-700 ${
-                          isPlaying ? "scale-110" : "group-hover:scale-110"
+                          isActive ? "scale-110" : "group-hover:scale-110"
                         }`}
                       />
                       
                       {/* Play Overlay */}
                       <div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center transition-opacity duration-300 ${
-                        isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                       }`}>
                         <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
-                          {isPlaying ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" className="ml-1" />}
+                          {isActive ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" className="ml-1" />}
                         </div>
                       </div>
                     </div>
@@ -194,7 +185,7 @@ const SuggestedMusic = ({ query }) => {
                     {/* Song Info */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="overflow-hidden">
-                        <h3 className={`font-heading font-bold text-lg truncate ${isPlaying ? "text-purple-400" : "text-white"}`}>
+                        <h3 className={`font-heading font-bold text-lg truncate ${isCurrentSong ? "text-purple-400" : "text-white"}`}>
                           {track.name}
                         </h3>
                         <p className="text-xs text-gray-400 truncate group-hover:text-gray-300 transition-colors">
@@ -202,8 +193,8 @@ const SuggestedMusic = ({ query }) => {
                         </p>
                       </div>
 
-                      {/* Mini Visualizer */}
-                      {isPlaying ? (
+                      {/* Visualizer / Icon */}
+                      {isActive ? (
                         <div className="flex gap-[2px] items-end h-4 mt-1">
                           <div className="bar h-2"></div>
                           <div className="bar h-3"></div>
@@ -227,8 +218,8 @@ const SuggestedMusic = ({ query }) => {
         </motion.div>
       )}
 
-      {/* Hidden Audio Player */}
-      <audio ref={audioRef} onEnded={() => setPlayingUrl(null)} />
+      {/* 5. REMOVED: <audio ref={audioRef} /> */}
+      {/* We DO NOT put an audio tag here anymore. It lives in App.jsx via MusicContext. */}
     </div>
   );
 };

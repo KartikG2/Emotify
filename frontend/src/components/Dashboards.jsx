@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { FaSearch, FaUserCircle, FaHistory, FaRobot, FaFingerprint, FaSignOutAlt, FaSignInAlt } from "react-icons/fa";
+import { FaSearch, FaHistory, FaRobot, FaFingerprint } from "react-icons/fa";
 import { motion } from "framer-motion";
 import axios from "axios";
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { Link, useNavigate } from "react-router-dom"; 
 import SuggestedMusic from "./SuggestedMusic";
 
 // --- Custom Fonts & Styles Injection ---
@@ -55,7 +55,12 @@ const Dashboard = () => {
   const [moodHistory, setMoodHistory] = useState([]);
   const [lastMood, setLastMood] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [user, setUser] = useState(null); // Managed in state
+  const [user, setUser] = useState(null);
+  
+  // New State for Search Functionality
+  const [headerSearchInput, setHeaderSearchInput] = useState(""); // What user types
+  const [activeQuery, setActiveQuery] = useState("lofi"); // What actually triggers the fetch
+  
   const navigate = useNavigate();
 
   // Mouse parallax effect
@@ -72,25 +77,43 @@ const Dashboard = () => {
 
   // Load User & Mood History
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("User"));
-    setUser(storedUser);
+    const storedUser = localStorage.getItem("User");
+    
+    // 1. AUTH CHECK: Redirect if no user
+    if (!storedUser) {
+        navigate("/login");
+        return;
+    }
 
-    if (storedUser?.email) {
+    const parsedUser = JSON.parse(storedUser);
+    setUser(parsedUser);
+
+    if (parsedUser?.email) {
       axios
-        .get(`http://localhost:4000/mood/history/${storedUser.email}`, {
+        .get(`http://localhost:4000/mood/history/${parsedUser.email}`, {
           withCredentials: true,
         })
         .then((res) => {
           const history = res.data.reverse();
           setMoodHistory(history);
-          setLastMood(history[0]);
+          if (history.length > 0) {
+              setLastMood(history[0]);
+              // 2. SYNC: Set initial music to match last mood
+              setActiveQuery(history[0].mood);
+          }
         })
         .catch((err) => {
           console.error("Failed to fetch mood history:", err);
         });
     }
-  }, []);
+  }, [navigate]);
 
+  // 3. SEARCH HANDLER: Only search on Enter to save API calls
+  const handleHeaderSearch = (e) => {
+    if (e.key === 'Enter' && headerSearchInput.trim() !== "") {
+        setActiveQuery(headerSearchInput);
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-[#030303] text-white font-body overflow-x-hidden selection:bg-fuchsia-500 selection:text-white">
@@ -131,6 +154,9 @@ const Dashboard = () => {
             <input
               type="text"
               placeholder="Search library..."
+              value={headerSearchInput}
+              onChange={(e) => setHeaderSearchInput(e.target.value)}
+              onKeyDown={handleHeaderSearch} // Triggers search on Enter
               className="glass-search w-full text-white rounded-full py-3 px-5 pl-10 text-sm focus:outline-none focus:border-purple-500 transition-all"
             />
             <FaSearch className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
@@ -162,7 +188,7 @@ const Dashboard = () => {
                     {lastMood?.emoji || "😐"}
                 </div>
                 <p className="text-3xl font-bold text-white capitalize mb-1">
-                    {lastMood?.mood || "Sad"}
+                    {lastMood?.mood || "Neutral"}
                 </p>
                 <p className="text-xs text-gray-500">Detected via Facial Scan</p>
              </div>
@@ -251,7 +277,8 @@ const Dashboard = () => {
               <h3 className="text-2xl font-heading font-bold text-white">Suggested for You</h3>
            </div>
            
-           <SuggestedMusic query={lastMood?.mood || "happy"} />
+           {/* Passed activeQuery which is either the mood OR the user search */}
+           <SuggestedMusic query={activeQuery} />
         </motion.section>
 
       </main>

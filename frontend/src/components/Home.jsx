@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { FaHeadphones, FaMusic, FaSmile, FaPlay, FaMagic, FaFingerprint } from 'react-icons/fa';
+import { FaHeadphones, FaMusic, FaSmile, FaPlay, FaMagic, FaFingerprint, FaPause } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import { useMusic } from '../context/MusicContext'; // 1. Import Context
 
 // Import your audio files
 import excuse from "../music/Excuses.mp3";
@@ -31,6 +32,50 @@ const Home = () => {
   const { scrollYProgress } = useScroll();
   const yBg = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // 2. Destructure Global Music Controls
+  const { playTrack, currentTrack, isPlaying, setTracks, togglePlay } = useMusic();
+
+  // 3. Create Local Data Array
+  const localSongs = [
+    { id: "local_1", title: "Excuses", artist: "AP Dhillon", image: "https://c.saavncdn.com/890/Excuses-English-2021-20210930112054-500x500.jpg", audio: excuse },
+    { id: "local_2", title: "295", artist: "Sidhu Moose Wala", image: "https://i1.sndcdn.com/artworks-zs1LZCGop7fKxviM-OwQ5zg-t1080x1080.jpg", audio: sidhu },
+    { id: "local_3", title: "Jatt Di Clip 2", artist: "Singga", image: "https://lyricsgana.wordpress.com/wp-content/uploads/2019/12/singga_jatt_di_clip_2-1.jpg?w=1024", audio: jatt },
+    { id: "local_4", title: "Paani Paani", artist: "AP Dhillon", image: "https://i.scdn.co/image/ab67616d0000b273365b3fb800c19f7ff72602da", audio: brownMunde },
+  ];
+
+  // 4. Helper: Convert Local Song to "Spotify-like" Object for Global Player
+  const handlePlayLocal = (song) => {
+    // Map to format expected by MusicContext
+    const trackObject = {
+      id: song.id,
+      name: song.title,
+      artists: [{ name: song.artist }],
+      preview_url: song.audio, // Critical: This lets the global player play the file
+      album: {
+        images: [{ url: song.image }]
+      }
+    };
+
+    // If this exact song is already playing, just toggle it
+    if (currentTrack?.id === song.id) {
+        togglePlay();
+        return;
+    }
+
+    // Otherwise, update the global queue and play
+    // We convert ALL local songs so 'Next/Prev' buttons work within this list
+    const queue = localSongs.map(s => ({
+        id: s.id,
+        name: s.title,
+        artists: [{ name: s.artist }],
+        preview_url: s.audio,
+        album: { images: [{ url: s.image }] }
+    }));
+
+    setTracks(queue);
+    playTrack(trackObject);
+  };
 
   // Mouse parallax effect for background
   useEffect(() => {
@@ -140,16 +185,16 @@ const Home = () => {
               </div>
 
               <div className="space-y-6 relative z-10">
-                 <p className="text-lg text-gray-300 leading-relaxed font-light">
+                  <p className="text-lg text-gray-300 leading-relaxed font-light">
                   "Emotify powers the backbone of next-gen music recommendation systems with state-of-the-art emotion detection & real-time mood matching."
-                 </p>
-                 <div className="h-[1px] w-full bg-white/10" />
-                 <div className="flex justify-between items-center">
+                  </p>
+                  <div className="h-[1px] w-full bg-white/10" />
+                  <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-500 font-mono">EMOTIFY Live</span>
                     <button className="text-sm font-bold text-white hover:text-fuchsia-400 transition-colors uppercase tracking-wider" onClick={() => window.location.href = "/login"}>
                       Start Scan &rarr;
                     </button>
-                 </div>
+                  </div>
               </div>
             </div>
           </motion.div>
@@ -229,39 +274,57 @@ const Home = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { title: "Excuses", artist: "AP Dhillon", image: "https://c.saavncdn.com/890/Excuses-English-2021-20210930112054-500x500.jpg", audio: excuse },
-              { title: "295", artist: "Sidhu Moose Wala", image: "https://i1.sndcdn.com/artworks-zs1LZCGop7fKxviM-OwQ5zg-t1080x1080.jpg", audio: sidhu },
-              { title: "Jatt Di Clip 2", artist: "Singga", image: "https://lyricsgana.wordpress.com/wp-content/uploads/2019/12/singga_jatt_di_clip_2-1.jpg?w=1024", audio: jatt },
-              { title: "Paani Paani", artist: "AP Dhillon", image: "https://i.scdn.co/image/ab67616d0000b273365b3fb800c19f7ff72602da", audio: brownMunde },
-            ].map((song, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -10, rotateX: 5, rotateY: 5 }}
-                className="group relative bg-[#111] rounded-3xl p-4 border border-white/5 hover:border-fuchsia-500/30 transition-all duration-500 shadow-2xl hover:shadow-fuchsia-900/20"
-                style={{ perspective: '1000px' }}
-              >
-                <div className="relative overflow-hidden rounded-2xl mb-5 aspect-square">
-                    <img src={song.image} alt={song.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
-                        <button className="w-14 h-14 bg-fuchsia-500 rounded-full flex items-center justify-center text-white pl-1 shadow-lg transform scale-0 group-hover:scale-100 transition-transform duration-300 cubic-bezier(0.175, 0.885, 0.32, 1.275)">
-                            <FaPlay />
-                        </button>
+            {localSongs.map((song, index) => {
+                // Determine if this specific song is the one currently active in the global player
+                const isThisSongPlaying = currentTrack?.id === song.id && isPlaying;
+
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ y: -10, rotateX: 5, rotateY: 5 }}
+                    className={`group relative bg-[#111] rounded-3xl p-4 border transition-all duration-500 shadow-2xl ${
+                        isThisSongPlaying ? "border-fuchsia-500/50 shadow-fuchsia-500/20 scale-105" : "border-white/5 hover:border-fuchsia-500/30 hover:shadow-fuchsia-900/20"
+                    }`}
+                    style={{ perspective: '1000px' }}
+                  >
+                    <div className="relative overflow-hidden rounded-2xl mb-5 aspect-square">
+                        <img src={song.image} alt={song.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                        
+                        {/* Play Button Overlay - Now connected to Global Context */}
+                        <div className={`absolute inset-0 bg-black/40 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm ${
+                            isThisSongPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}>
+                            <button 
+                                onClick={() => handlePlayLocal(song)}
+                                className="w-14 h-14 bg-fuchsia-500 rounded-full flex items-center justify-center text-white shadow-lg transform transition-transform duration-300 hover:scale-110"
+                            >
+                                {isThisSongPlaying ? <FaPause /> : <FaPlay className="ml-1" />}
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div className="px-2">
-                  <h3 className="text-lg font-heading font-bold text-white truncate">{song.title}</h3>
-                  <p className="text-sm text-gray-500 mb-4 font-medium">{song.artist}</p>
-                  <audio controls className="w-full h-8 opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0 invert">
-                    <source src={song.audio} type="audio/mpeg" />
-                  </audio>
-                </div>
-              </motion.div>
-            ))}
+                    
+                    <div className="px-2">
+                      <h3 className={`text-lg font-heading font-bold truncate ${isThisSongPlaying ? "text-fuchsia-400" : "text-white"}`}>
+                          {song.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-4 font-medium">{song.artist}</p>
+                      
+                      {/* Visualizer Bar (Visible when playing) */}
+                      {isThisSongPlaying && (
+                          <div className="flex gap-1 h-1 w-full justify-center items-end">
+                              <div className="w-full h-full bg-fuchsia-500/20 rounded-full overflow-hidden">
+                                  <div className="h-full bg-fuchsia-500 animate-[shimmer_2s_infinite_linear] w-1/2" />
+                              </div>
+                          </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+            })}
           </div>
         </div>
       </section>
