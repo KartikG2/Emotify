@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Mic, MicOff, Activity, Power, WifiOff } from "lucide-react";
+import { Mic, MicOff, Activity, Power, WifiOff, Move } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMusic } from "../context/MusicContext";
 
@@ -11,6 +11,21 @@ const VoiceAssistant = () => {
   useEffect(() => {
     controlsRef.current = music;
   }, [music]);
+
+  // --- AUTO PLAY NEXT TRACK ---
+  // Listens for the audio 'ended' event to trigger the next song automatically
+  useEffect(() => {
+    const audio = music.audioRef?.current;
+    if (!audio) return;
+
+    const handleEnded = () => {
+      // Use controlsRef to access the latest nextTrack function
+      controlsRef.current.nextTrack();
+    };
+
+    audio.addEventListener("ended", handleEnded);
+    return () => audio.removeEventListener("ended", handleEnded);
+  }, [music.audioRef]);
 
   // --- UI State ---
   const [isMicrophoneOn, setIsMicrophoneOn] = useState(false); 
@@ -24,10 +39,14 @@ const VoiceAssistant = () => {
   const isActiveRef = useRef(false); 
   const isProcessingRef = useRef(false); 
   const shouldBeOnRef = useRef(false);
-  const lastErrorRef = useRef(null); // <--- NEW: Tracks error for restart logic
+  const lastErrorRef = useRef(null);
+  
+  // Ref for drag boundaries
+  const constraintsRef = useRef(null);
 
   // --- RECOGNITION SETUP ---
   useEffect(() => {
+    // Brave supports webkitSpeechRecognition but often blocks the connection to Google
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         console.error("Browser does not support Speech API");
@@ -39,24 +58,36 @@ const VoiceAssistant = () => {
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
+    // --- Connectivity Listeners ---
+    const handleOnline = () => setErrorState(null);
+    const handleOffline = () => setErrorState("network");
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     recognition.onstart = () => {
         setIsMicrophoneOn(true);
         setErrorState(null);
-        lastErrorRef.current = null; // Reset error ref on successful start
+        lastErrorRef.current = null;
     };
 
     recognition.onerror = (event) => {
-        // Ignore "no-speech" as it's normal behavior for always-on listening
+        // Ignore "no-speech" as it's normal behavior
         if (event.error === 'no-speech') {
             lastErrorRef.current = 'no-speech';
             return; 
         }
 
         console.log("Voice Error:", event.error);
-        lastErrorRef.current = event.error; // Save error to ref
+        lastErrorRef.current = event.error;
 
-        if (event.error === 'network') setErrorState("network");
-        if (event.error === 'not-allowed') {
+        // FIXED for Brave Browser:
+        if (event.error === 'network') {
+            if (!navigator.onLine) {
+                setErrorState("network");
+            } else {
+                console.warn("Speech API blocked or failed (Brave Shield likely active).");
+            }
+        } else if (event.error === 'not-allowed') {
             setErrorState("permission");
             shouldBeOnRef.current = false;
             setIsMicrophoneOn(false);
@@ -68,11 +99,8 @@ const VoiceAssistant = () => {
         
         // Smart Restart Logic
         if (shouldBeOnRef.current) {
-            // Check the REF, not the state (State is stale inside useEffect)
             const isNetworkError = lastErrorRef.current === 'network';
-            
-            // Wait 2s for network errors, 1s for normal restarts (prevents rapid looping)
-            const delay = isNetworkError ? 2000 : 1000; 
+            const delay = isNetworkError ? 2000 : 200; 
             
             setTimeout(() => {
                 if (shouldBeOnRef.current) {
@@ -89,6 +117,8 @@ const VoiceAssistant = () => {
     recognition.onresult = (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
       console.log("🎤 Heard:", transcript);
+      
+      // Clear errors on success
       setErrorState(null);
       lastErrorRef.current = null;
 
@@ -108,6 +138,8 @@ const VoiceAssistant = () => {
     return () => {
         shouldBeOnRef.current = false;
         recognition.abort();
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
     };
   }, []); 
 
@@ -119,7 +151,6 @@ const VoiceAssistant = () => {
     if (visualActive) {
       audio.volume = 0.2; // Lower volume when listening
     } else {
-      // Restore volume safely
       const safeVolume = (Number.isFinite(music.volume) && music.volume >= 0 && music.volume <= 1) ? music.volume : 1.0;
       audio.volume = safeVolume; 
     }
@@ -146,10 +177,9 @@ const VoiceAssistant = () => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    const controls = controlsRef.current; // Access latest controls
+    const controls = controlsRef.current; 
     let commandFound = true;
 
-    // 1. PLAY / SEARCH LOGIC (Improved)
     if (text.startsWith("play ")) {
         let query = text.replace("play", "").replace("songs", "").replace("song", "").trim();
         if (!query) query = "lofi";
@@ -157,7 +187,6 @@ const VoiceAssistant = () => {
         controls.searchAndPlay(query);
         resetToStandby(); 
     
-    // 2. NAVIGATION
     } else if (text.includes("next") || text.includes("skip")) {
         speak("Next");
         controls.nextTrack();
@@ -165,7 +194,6 @@ const VoiceAssistant = () => {
         speak("Previous");
         controls.prevTrack();
     
-    // 3. PLAYBACK STATE
     } else if (text.includes("stop") || text.includes("pause")) {
         speak("Paused");
         controls.togglePlay();
@@ -175,7 +203,6 @@ const VoiceAssistant = () => {
         controls.togglePlay();
         resetToStandby();
 
-    // 4. VOLUME
     } else if (text.includes("volume up") || text.includes("increase") || text.includes("louder")) {
         controls.adjustVolume("up");
         resetToStandby(); 
@@ -211,7 +238,7 @@ const VoiceAssistant = () => {
         recognitionRef.current.abort();
         setIsMicrophoneOn(false);
         resetToStandby();
-        setErrorState(null); // Clear errors on manual stop
+        setErrorState(null);
     } else {
         shouldBeOnRef.current = true;
         try { recognitionRef.current.start(); } catch(e) {}
@@ -219,48 +246,65 @@ const VoiceAssistant = () => {
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-[9999] flex flex-col items-end gap-2">
-      <AnimatePresence>
-        {(feedback || visualActive || errorState === 'network') && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className={`backdrop-blur-md border px-4 py-2 rounded-xl mb-2 text-sm font-medium shadow-2xl 
-              ${errorState === 'network' ? "bg-red-900/90 border-red-400 text-white" :
-               visualActive ? "bg-purple-900/90 border-purple-400 text-white" : "bg-black/80 border-gray-600 text-gray-300"}`}
-          >
-            {errorState === 'network' ? "Reconnecting..." : feedback || "Listening..."}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <>
+      {/* Invisible Constraints Container */}
+      <div ref={constraintsRef} className="fixed inset-4 pointer-events-none z-[9990]" />
 
-      <motion.button
-        onClick={handleToggle}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        animate={{ 
-          scale: visualActive ? 1.2 : 1,
-          boxShadow: visualActive ? "0 0 30px #a855f7" : "0 0 10px rgba(0,0,0,0.5)"
-        }}
-        className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500
-          ${isMicrophoneOn
-            ? visualActive 
-                ? "bg-gradient-to-br from-purple-600 to-pink-600 border-2 border-white/20" 
-                : "bg-gray-800 border-2 border-purple-500/50"
-            : "bg-red-900/80 border-2 border-red-500/50"
-          }`}
+      <motion.div
+        drag
+        dragConstraints={constraintsRef}
+        dragMomentum={false}
+        whileDrag={{ scale: 1.1, cursor: "grabbing" }}
+        className="fixed bottom-24 right-6 z-[9999] flex flex-col items-end gap-2 cursor-grab touch-none"
+        style={{ touchAction: "none" }} // Prevents browser scrolling while dragging on mobile
       >
-        {visualActive && (
-           <span className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping"></span>
-        )}
-        <div className="relative z-10">
-           {errorState === 'network' ? <WifiOff className="text-white animate-pulse" /> : 
-            !isMicrophoneOn ? <Power className="text-red-200" /> : 
-            visualActive ? <Activity className="text-white animate-bounce" /> : <Mic className="text-purple-200" />}
-        </div>
-      </motion.button>
-    </div>
+        <AnimatePresence>
+          {(feedback || visualActive || errorState === 'network') && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.9 }}
+              className={`backdrop-blur-md border px-4 py-2 rounded-xl mb-2 text-sm font-medium shadow-2xl pointer-events-none whitespace-nowrap
+                ${errorState === 'network' ? "bg-red-900/90 border-red-400 text-white" :
+                 visualActive ? "bg-purple-900/90 border-purple-400 text-white" : "bg-black/80 border-gray-600 text-gray-300"}`}
+            >
+              {errorState === 'network' ? "Reconnecting..." : feedback || "Listening..."}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          onClick={handleToggle}
+          whileTap={{ scale: 0.9 }}
+          animate={{ 
+            scale: visualActive ? 1.2 : 1,
+            boxShadow: visualActive ? "0 0 30px #a855f7" : "0 0 10px rgba(0,0,0,0.5)"
+          }}
+          className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500 group
+            ${isMicrophoneOn
+              ? visualActive 
+                  ? "bg-gradient-to-br from-purple-600 to-pink-600 border-2 border-white/20" 
+                  : "bg-gray-800 border-2 border-purple-500/50"
+              : "bg-red-900/80 border-2 border-red-500/50"
+            }`}
+        >
+          {visualActive && (
+             <span className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping"></span>
+          )}
+          
+          {/* Drag Handle Indicator (Visible on Hover) */}
+          <div className="absolute -top-1 -right-1 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Move size={12} className="text-white" />
+          </div>
+
+          <div className="relative z-10">
+             {errorState === 'network' ? <WifiOff className="text-white animate-pulse" /> : 
+              !isMicrophoneOn ? <Power className="text-red-200" /> : 
+              visualActive ? <Activity className="text-white animate-bounce" /> : <Mic className="text-purple-200" />}
+          </div>
+        </motion.button>
+      </motion.div>
+    </>
   );
 };
 
