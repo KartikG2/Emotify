@@ -122,7 +122,7 @@ const OTPVerify = () => {
 
     try {
       await axios.post(
-        "http://localhost:4000/user/verify-otp",
+        "https://emotify-r0ms.onrender.com/user/verify-otp",
         { email: signupData.email, otp: otpCode },
         { withCredentials: true }
       );

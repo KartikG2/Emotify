@@ -5,7 +5,12 @@ import { useMusic } from "../context/MusicContext";
 
 // ... (Keep PremiumStyles exactly as it was) ...
 const PremiumStyles = () => (
-  <style>{/* ... your styles ... */}</style>
+  <style>{`
+      @keyframes equalizer-mini { 0% { height: 20%; } 50% { height: 100%; } 100% { height: 20%; } }
+      .bar-mini { width: 3px; background: #a855f7; animation: equalizer-mini 0.8s infinite ease-in-out; border-radius: 2px; }
+      .glass-card-mini { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px); transition: all 0.3s ease; }
+      .glass-card-mini:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(168, 85, 247, 0.3); transform: translateY(-4px); }
+    `}</style>
 );
 
 export default function MusicPlayer() {

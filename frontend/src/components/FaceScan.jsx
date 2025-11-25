@@ -70,7 +70,7 @@ const FaceScan = () => {
   // --- 1. Load History on Mount ---
   useEffect(() => {
     if(user?.email) {
-        axios.get(`http://localhost:4000/mood/stats/${user.email}`)
+        axios.get(`https://emotify-r0ms.onrender.com/mood/stats/${user.email}`)
              .then(res => setDominantHistory(res.data.dominant))
              .catch(err => console.log("History fetch error", err));
     }
@@ -192,7 +192,7 @@ const FaceScan = () => {
   const saveExpressionToDB = async (mood) => {
     if (!user?.email) return;
     try {
-      await axios.post("http://localhost:4000/mood/save", { userId: user.email, mood });
+      await axios.post("https://emotify-r0ms.onrender.com/mood/save", { userId: user.email, mood });
     } catch (err) { console.error("DB Save Failed", err); }
   };
 

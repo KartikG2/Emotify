@@ -90,7 +90,7 @@ const Dashboard = () => {
 
     if (parsedUser?.email) {
       axios
-        .get(`http://localhost:4000/mood/history/${parsedUser.email}`, {
+        .get(`https://emotify-r0ms.onrender.com/mood/history/${parsedUser.email}`, {
           withCredentials: true,
         })
         .then((res) => {

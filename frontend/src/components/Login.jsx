@@ -80,7 +80,7 @@ export default function Login() {
     try {
       // 1. API Call
       const res = await axios.post(
-        "http://localhost:4000/user/login",
+        "https://emotify-r0ms.onrender.com/user/login",
         formData,
         { withCredentials: true }
       );
