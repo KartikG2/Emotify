@@ -65,7 +65,7 @@ const SuggestedMusic = ({ query }) => {
     setLoading(true);
     try {
       const res = await fetch(
-        `${process.env.REACT_APP_SPOTIFY_API}/search?q=${searchQuery}&type=track`
+        `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${searchQuery}&type=track`
       );
       const data = await res.json();
       const validSongs = (data.tracks?.items || []).filter(song => song.preview_url);

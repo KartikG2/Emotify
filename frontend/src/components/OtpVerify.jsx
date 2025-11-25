@@ -149,7 +149,7 @@ const OTPVerify = () => {
     }
 
     try {
-      await axios.post("http://localhost:5000/user/resend-otp", { 
+      await axios.post("https://emotify-r0ms.onrender.com/user/resend-otp", { 
         email: signupData.email 
       });
       setTimer(60); // Reset timer to 60s

@@ -74,7 +74,7 @@ export default function Signup() {
 
     try {
       await axios.post(
-        "https://emotify-r0ms.onrender.com/User/register",
+        "https://emotify-r0ms.onrender.com/user/register",
         formData,
         { withCredentials: true }
       );

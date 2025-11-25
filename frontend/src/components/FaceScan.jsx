@@ -308,11 +308,14 @@ const FaceScan = () => {
                    </div>
                    
                    <div className="text-5xl md:text-6xl animate-bounce">
-                      {moodData.mood === 'happy' && '⚡'}
-                      {moodData.mood === 'sad' && '🌧️'}
-                      {moodData.mood === 'angry' && '🔥'}
-                      {moodData.mood === 'neutral' && '🌊'}
-                      {moodData.mood === 'surprised' && '✨'}
+                      {moodData.mood === 'happy' && '😁'}
+                      {moodData.mood === 'sad' && '😟'}
+                      {moodData.mood === 'angry' && '😠'}
+                      {moodData.mood === 'neutral' && '😐'}
+                      {moodData.mood === 'surprised' && '😲'}
+                      {moodData.mood === 'fearful' && '😨'}
+                      {moodData.mood === 'disgusted' && '🤢'}
+                      {!moodData.mood && '⌛'}
                    </div>
                 </div>
              </motion.div>
