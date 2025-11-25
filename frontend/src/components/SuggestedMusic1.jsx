@@ -86,7 +86,7 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
 
       try {
         const res = await fetch(
-          `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${encodeURIComponent(query)}&type=track`
+          `${process.env.REACT_APP_SPOTIFY_API}/search?q=${encodeURIComponent(query)}&type=track`
         );
         const data = await res.json();
         // Filter for valid preview URLs and limit results

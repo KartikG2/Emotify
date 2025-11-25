@@ -51,7 +51,7 @@ export const MusicProvider = ({ children }) => {
     isFetchingRef.current = true;
     try {
       const res = await fetch(
-        `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${query}&type=track`
+        `${process.env.REACT_APP_SPOTIFY_API}/search?q=${query}&type=track`
       );
 
       // 4. API LIMIT CHECK
