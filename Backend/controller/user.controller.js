@@ -2,7 +2,10 @@ import User from "../model/User.model.js";
 import OTP from "../model/otp.model.js";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
+import { Resend } from 'resend'; // Import Resend
+
+// Initialize Resend with your API Key
+const resend = new Resend(process.env.RESEND_KEY);
 
 // 1. REGISTER: Hash password -> Send OTP
 export const registerController = async (req, res) => {
@@ -12,11 +15,6 @@ export const registerController = async (req, res) => {
   }
 
   try {
-
-    console.log("Debug Email Config:", {
-      UserExists: !!process.env.EMAIL,
-      PassExists: !!process.env.EMAIL_PASS
-    });
     const { username, email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
@@ -41,19 +39,7 @@ export const registerController = async (req, res) => {
       otp,
     });
 
-    // 5. Send Email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',  // Try the shorthand service again with 587, it handles the headers best
-      host: 'smtp.gmail.com',
-      port: 587,         // Standard secure port
-      secure: false,     // Must be false for 587
-      auth: {
-        user: process.env.EMAIL,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // HTML Email Template
+    // 5. HTML Email Template
     const emailTemplate = `
       <div style="font-family: Helvetica, Arial, sans-serif; min-width: 1000px; overflow:auto; line-height: 2">
         <div style="margin: 50px auto; width: 70%; padding: 20px 0">
@@ -74,18 +60,19 @@ export const registerController = async (req, res) => {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: `" Emotify Support" <${process.env.EMAIL}>`, // Shows "Emotify Support" as sender name
-      to: email,
-      subject: "Verify Your Account - Emotify",
-      text: `Your OTP is: ${otp}`, // Fallback for non-HTML email clients
-      html: emailTemplate, // <--- This is the new bold design
+    // 6. Send Email via Resend API
+    // NOTE: On Free Tier, you can ONLY send to your own email address until you verify a domain.
+    await resend.emails.send({
+      from: 'onboarding@resend.dev', // REQUIRED: Use this exact email for Free Tier
+      to: email,                     
+      subject: 'Verify Your Account - Emotify',
+      html: emailTemplate
     });
 
     return res.status(200).json({ msg: "OTP sent to your email." });
   } catch (error) {
     console.error("❌ Error in registerController:", error);
-    return res.status(500).send("Internal Server Error");
+    return res.status(500).send("Error sending email.");
   }
 };
 
@@ -152,7 +139,6 @@ export const resendOTPController = async (req, res) => {
       return res.status(400).json({ msg: "Email is required" });
     }
 
-    // Check if the temp user still exists (hasn't expired)
     const tempUser = await OTP.findOne({ email });
 
     if (!tempUser) {
@@ -166,37 +152,25 @@ export const resendOTPController = async (req, res) => {
     tempUser.otp = otp;
     await tempUser.save();
 
-    // Send Email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',  // 
-      host: 'smtp.gmail.com',
-      port: 587,         // Standard secure port
-      secure: false,     // Must be false for 587
-      auth: {
-        user: process.env.EMAIL,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
     const emailTemplate = `
       <div style="font-family: Helvetica, Arial, sans-serif; min-width: 1000px; overflow:auto; line-height: 2">
         <div style="margin: 50px auto; width: 70%; padding: 20px 0">
           <div style="border-bottom: 1px solid #eee">
-            <a href="" style="font-size: 1.4em; color: #00466a; text-decoration:none; font-weight:600">MoodSync</a>
+            <a href="" style="font-size: 1.4em; color: #00466a; text-decoration:none; font-weight:600">Emotify</a>
           </div>
           <p style="font-size:1.1em">Hi, <b>${tempUser.username}</b></p>
           <p>Here is your new verification code. It is valid for 5 minutes.</p>
           <h2 style="background: #00466a; margin: 0 auto; width: max-content; padding: 0 10px; color: #fff; border-radius: 4px;">${otp}</h2>
-          <p style="font-size:0.9em;">Regards,<br />MoodSync Team</p>
+          <p style="font-size:0.9em;">Regards,<br />Emotify Team</p>
         </div>
       </div>
     `;
 
-    await transporter.sendMail({
-      from: `"Emotify Support" <${process.env.EMAIL}>`,
+    // Send via Resend
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: email,
-      subject: "New Verification Code - Emotify",
-      text: `Your new OTP is: ${otp}`,
+      subject: 'New Verification Code - Emotify',
       html: emailTemplate,
     });
 
