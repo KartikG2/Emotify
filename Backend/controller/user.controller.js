@@ -12,6 +12,11 @@ export const registerController = async (req, res) => {
   }
 
   try {
+    
+    console.log("Debug Email Config:", { 
+      UserExists: !!process.env.EMAIL, 
+      PassExists: !!process.env.EMAIL_PASS 
+  });
     const { username, email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
@@ -38,7 +43,9 @@ export const registerController = async (req, res) => {
 
     // 5. Send Email
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com", // Explicit host
+      port: 465,              // Secure port
+      secure: true,           // true for 465, false for other ports
       auth: {
         user: process.env.EMAIL,
         pass: process.env.EMAIL_PASS,
@@ -146,22 +153,27 @@ export const resendOTPController = async (req, res) => {
 
     // Check if the temp user still exists (hasn't expired)
     const tempUser = await OTP.findOne({ email });
-    
+
     if (!tempUser) {
       return res.status(400).json({ msg: "Session expired. Please sign up again." });
     }
 
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Update the document
     tempUser.otp = otp;
     await tempUser.save();
 
     // Send Email
     const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.EMAIL, pass: process.env.EMAIL_PASS },
+      host: "smtp.gmail.com", // Explicit host
+      port: 465,              // Secure port
+      secure: true,           // true for 465, false for other ports
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_PASS,
+      },
     });
 
     const emailTemplate = `
@@ -179,9 +191,9 @@ export const resendOTPController = async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: `"MoodSync Support" <${process.env.EMAIL}>`,
+      from: `"Emotify Support" <${process.env.EMAIL}>`,
       to: email,
-      subject: "New Verification Code - MoodSync",
+      subject: "New Verification Code - Emotify",
       text: `Your new OTP is: ${otp}`,
       html: emailTemplate,
     });
