@@ -12,11 +12,11 @@ export const registerController = async (req, res) => {
   }
 
   try {
-    
-    console.log("Debug Email Config:", { 
-      UserExists: !!process.env.EMAIL, 
-      PassExists: !!process.env.EMAIL_PASS 
-  });
+
+    console.log("Debug Email Config:", {
+      UserExists: !!process.env.EMAIL,
+      PassExists: !!process.env.EMAIL_PASS
+    });
     const { username, email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
@@ -43,9 +43,10 @@ export const registerController = async (req, res) => {
 
     // 5. Send Email
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", // Explicit host
-      port: 465,              // Secure port
-      secure: true,           // true for 465, false for other ports
+      service: 'gmail',  // Try the shorthand service again with 587, it handles the headers best
+      host: 'smtp.gmail.com',
+      port: 587,         // Standard secure port
+      secure: false,     // Must be false for 587
       auth: {
         user: process.env.EMAIL,
         pass: process.env.EMAIL_PASS,
@@ -167,9 +168,10 @@ export const resendOTPController = async (req, res) => {
 
     // Send Email
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com", // Explicit host
-      port: 465,              // Secure port
-      secure: true,           // true for 465, false for other ports
+      service: 'gmail',  // 
+      host: 'smtp.gmail.com',
+      port: 587,         // Standard secure port
+      secure: false,     // Must be false for 587
       auth: {
         user: process.env.EMAIL,
         pass: process.env.EMAIL_PASS,
