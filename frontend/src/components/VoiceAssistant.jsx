@@ -23,7 +23,8 @@ const VoiceAssistant = () => {
   const silenceTimer = useRef(null);
   const isActiveRef = useRef(false); 
   const isProcessingRef = useRef(false); 
-  const shouldBeOnRef = useRef(false); 
+  const shouldBeOnRef = useRef(false);
+  const lastErrorRef = useRef(null); // <--- NEW: Tracks error for restart logic
 
   // --- RECOGNITION SETUP ---
   useEffect(() => {
@@ -41,9 +42,19 @@ const VoiceAssistant = () => {
     recognition.onstart = () => {
         setIsMicrophoneOn(true);
         setErrorState(null);
+        lastErrorRef.current = null; // Reset error ref on successful start
     };
 
     recognition.onerror = (event) => {
+        // Ignore "no-speech" as it's normal behavior for always-on listening
+        if (event.error === 'no-speech') {
+            lastErrorRef.current = 'no-speech';
+            return; 
+        }
+
+        console.log("Voice Error:", event.error);
+        lastErrorRef.current = event.error; // Save error to ref
+
         if (event.error === 'network') setErrorState("network");
         if (event.error === 'not-allowed') {
             setErrorState("permission");
@@ -54,12 +65,22 @@ const VoiceAssistant = () => {
 
     recognition.onend = () => {
         setIsMicrophoneOn(false);
+        
         // Smart Restart Logic
         if (shouldBeOnRef.current) {
-            const delay = errorState === 'network' ? 2000 : 500;
+            // Check the REF, not the state (State is stale inside useEffect)
+            const isNetworkError = lastErrorRef.current === 'network';
+            
+            // Wait 2s for network errors, 1s for normal restarts (prevents rapid looping)
+            const delay = isNetworkError ? 2000 : 1000; 
+            
             setTimeout(() => {
                 if (shouldBeOnRef.current) {
-                    try { recognition.start(); } catch (e) {}
+                    try { 
+                        recognition.start(); 
+                    } catch (e) {
+                        console.warn("Restart failed, retrying...");
+                    }
                 }
             }, delay);
         }
@@ -69,6 +90,7 @@ const VoiceAssistant = () => {
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
       console.log("🎤 Heard:", transcript);
       setErrorState(null);
+      lastErrorRef.current = null;
 
       if (!isActiveRef.current) {
         const wakeWords = ["hey emotify", "emotify", "hey spotify", "modify", "notify", "play music"];
@@ -101,7 +123,7 @@ const VoiceAssistant = () => {
       const safeVolume = (Number.isFinite(music.volume) && music.volume >= 0 && music.volume <= 1) ? music.volume : 1.0;
       audio.volume = safeVolume; 
     }
-  }, [visualActive, music.volume, music.audioRef]);
+  }, [visualActive, music.volume]);
 
   // --- HELPERS ---
   const speak = (msg) => {
@@ -129,18 +151,11 @@ const VoiceAssistant = () => {
 
     // 1. PLAY / SEARCH LOGIC (Improved)
     if (text.startsWith("play ")) {
-        // Remove noise words to get a clean search query
-        let query = text.replace("play", "")
-                        .replace("songs", "")
-                        .replace("song", "")
-                        .trim();
-        
-        // If query became empty, default to lofi
+        let query = text.replace("play", "").replace("songs", "").replace("song", "").trim();
         if (!query) query = "lofi";
-
         speak(`Playing ${query}`);
         controls.searchAndPlay(query);
-        resetToStandby(); // Sleep immediately so song can play
+        resetToStandby(); 
     
     // 2. NAVIGATION
     } else if (text.includes("next") || text.includes("skip")) {
@@ -160,22 +175,19 @@ const VoiceAssistant = () => {
         controls.togglePlay();
         resetToStandby();
 
-    // 4. VOLUME (Immediate Sleep for Feedback)
+    // 4. VOLUME
     } else if (text.includes("volume up") || text.includes("increase") || text.includes("louder")) {
         controls.adjustVolume("up");
         resetToStandby(); 
-
     } else if (text.includes("volume down") || text.includes("decrease") || text.includes("quieter")) {
         controls.adjustVolume("down");
         resetToStandby(); 
-
     } else {
         commandFound = false;
     }
 
     if (commandFound && isActiveRef.current) resetSilenceTimer();
     
-    // Unlock processing after 1s
     setTimeout(() => { isProcessingRef.current = false; }, 1000);
   };
 
@@ -183,12 +195,12 @@ const VoiceAssistant = () => {
     if (silenceTimer.current) clearTimeout(silenceTimer.current);
     silenceTimer.current = setTimeout(() => {
       resetToStandby();
-    }, 10000); // 10 seconds awake
+    }, 10000); 
   };
 
   const resetToStandby = () => {
     isActiveRef.current = false;
-    setVisualActive(false); // Triggers volume restore
+    setVisualActive(false); 
     setFeedback("");
   };
 
@@ -199,6 +211,7 @@ const VoiceAssistant = () => {
         recognitionRef.current.abort();
         setIsMicrophoneOn(false);
         resetToStandby();
+        setErrorState(null); // Clear errors on manual stop
     } else {
         shouldBeOnRef.current = true;
         try { recognitionRef.current.start(); } catch(e) {}
