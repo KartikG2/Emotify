@@ -33,6 +33,9 @@ mongoose.connect(process.env.MONGOURI)
 // Routes
 app.get('/', (_, res) => res.send('Backend Live'));
 
+// Health Check (Returns 200 OK)
+app.get('/health', (_, res) => res.status(200).json({ status: 'success', message: 'Server is healthy' }));
+
 app.use("/user", UserRoutes);
 app.use("/mood", HistoryRoutes); 
 app.use("/lastmood", LastMoodRoutes);
