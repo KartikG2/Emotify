@@ -123,7 +123,7 @@ const VoiceAssistant = () => {
       lastErrorRef.current = null;
 
       if (!isActiveRef.current) {
-        const wakeWords = ["hey emotify", "emotify", "hey spotify", "modify", "notify", "play music"];
+        const wakeWords = ["hey emotify", "emotify", "hey spotify", "modify", "notify", "play music","hey",];
         if (wakeWords.some(word => transcript.includes(word))) {
             activateAssistant();
         }

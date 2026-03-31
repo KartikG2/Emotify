@@ -39,40 +39,44 @@ export const registerController = async (req, res) => {
       otp,
     });
 
-    // 5. HTML Email Template
+    // 5. Branded Premium Email Template (Dark Mode)
     const emailTemplate = `
-      <div style="font-family: Helvetica, Arial, sans-serif; min-width: 1000px; overflow:auto; line-height: 2">
-        <div style="margin: 50px auto; width: 70%; padding: 20px 0">
-          <div style="border-bottom: 1px solid #eee">
-            <a href="" style="font-size: 1.4em; color: #00466a; text-decoration:none; font-weight:600">Emotify</a>
+      <div style="background-color: #030303; color: #ffffff; font-family: 'Outfit', Helvetica, Arial, sans-serif; padding: 40px 20px; text-align: center;">
+        <div style="max-width: 600px; margin: 0 auto; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 24px; padding: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+          <div style="margin-bottom: 30px;">
+            <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #fff 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">EMOTIFY</h1>
           </div>
-          <p style="font-size:1.1em">Hi, <b>${username}</b></p>
-          <p>Thank you for choosing Emotify. Use the following OTP to complete your Sign Up procedures. This OTP is valid for 5 minutes.</p>
-          
-          <h2 style="background: #00466a; margin: 0 auto; width: max-content; padding: 0 10px; color: #fff; border-radius: 4px;">${otp}</h2>
-          
-          <p style="font-size:0.9em;">Regards,<br />Emotify Team</p>
-          <hr style="border:none;border-top:1px solid #eee" />
-          <div style="float:right;padding:8px 0;color:#aaa;font-size:0.8em;line-height:1;font-weight:300">
-            <p>Emotify Inc</p>
+          <h2 style="font-size: 24px; font-weight: 600; margin-bottom: 10px; color: #fff;">Verify your account</h2>
+          <p style="color: #94a3b8; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+            Hi ${username}, welcome to Emotify! Use the verification code below to complete your registration. This code will expire in 5 minutes.
+          </p>
+          <div style="background: rgba(168, 85, 247, 0.1); border: 1px dashed rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 20px; display: inline-block; margin-bottom: 30px;">
+            <span style="font-family: 'Space Grotesk', monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #a855f7;">${otp}</span>
+          </div>
+          <p style="color: #64748b; font-size: 14px; margin-bottom: 0;">
+            If you didn't request this, you can safely ignore this email.
+          </p>
+          <div style="margin-top: 40px; border-top: 1px solid #1a1a1a; pt-20px;">
+            <p style="color: #475569; font-size: 12px;">&copy; ${new Date().getFullYear()} Emotify Inc. All rights reserved.</p>
           </div>
         </div>
       </div>
     `;
 
     // 6. Send Email via Resend API
-    // NOTE: On Free Tier, you can ONLY send to your own email address until you verify a domain.
-    await resend.emails.send({
-      from: 'onboarding@resend.dev', // REQUIRED: Use this exact email for Free Tier
+    const data = await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: email,                     
       subject: 'Verify Your Account - Emotify',
       html: emailTemplate
     });
 
+    console.log("✅ Resend success:", data); // Check this in your terminal!
+
     return res.status(200).json({ msg: "OTP sent to your email." });
   } catch (error) {
-    console.error("❌ Error in registerController:", error);
-    return res.status(500).send("Error sending email.");
+    console.error("❌ Resend API Error in Register:", error.response?.data || error); // Added detailed logging
+    return res.status(500).json({ msg: "Failed to send email. Check backend logs." });
   }
 };
 
@@ -97,9 +101,18 @@ export const verifyOTP = async (req, res) => {
     });
 
     await newUser.save();
+    
+    // GENERATE JWT FOR INSTANT LOGIN
+    const token = newUser.generateJWT();
+    const { password: pw, ...userData } = newUser._doc;
+
     await OTP.deleteMany({ email });
 
-    return res.status(201).json({ msg: "Account created successfully!" });
+    return res.status(201).json({ 
+      msg: "Account verified successfully!",
+      user: userData,
+      token: token 
+    });
   } catch (error) {
     console.error("Verify Error:", error);
     return res.status(500).json({ msg: "Server error" });
@@ -153,30 +166,33 @@ export const resendOTPController = async (req, res) => {
     await tempUser.save();
 
     const emailTemplate = `
-      <div style="font-family: Helvetica, Arial, sans-serif; min-width: 1000px; overflow:auto; line-height: 2">
-        <div style="margin: 50px auto; width: 70%; padding: 20px 0">
-          <div style="border-bottom: 1px solid #eee">
-            <a href="" style="font-size: 1.4em; color: #00466a; text-decoration:none; font-weight:600">Emotify</a>
+      <div style="background-color: #030303; color: #ffffff; font-family: 'Outfit', Helvetica, Arial, sans-serif; padding: 40px 20px; text-align: center;">
+        <div style="max-width: 600px; margin: 0 auto; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 24px; padding: 40px;">
+          <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: #a855f7; margin-bottom: 20px;">EMOTIFY</h1>
+          <h2 style="font-size: 22px; font-weight: 600; margin-bottom: 10px; color: #fff;">New Verification Code</h2>
+          <p style="color: #94a3b8; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+            Here is your new verification code.
+          </p>
+          <div style="background: rgba(168, 85, 247, 0.1); border: 1px dashed rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 20px; display: inline-block;">
+            <span style="font-family: 'Space Grotesk', monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #a855f7;">${otp}</span>
           </div>
-          <p style="font-size:1.1em">Hi, <b>${tempUser.username}</b></p>
-          <p>Here is your new verification code. It is valid for 5 minutes.</p>
-          <h2 style="background: #00466a; margin: 0 auto; width: max-content; padding: 0 10px; color: #fff; border-radius: 4px;">${otp}</h2>
-          <p style="font-size:0.9em;">Regards,<br />Emotify Team</p>
         </div>
       </div>
     `;
 
     // Send via Resend
-    await resend.emails.send({
+    const data = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: email,
       subject: 'New Verification Code - Emotify',
       html: emailTemplate,
     });
 
+    console.log("✅ Resend logic (ResendOTP):", data);
+
     return res.status(200).json({ msg: "New code sent successfully." });
   } catch (error) {
-    console.error("Resend OTP Error:", error);
-    return res.status(500).json({ msg: "Failed to resend code." });
+    console.error("❌ Resend API Error in ResendOTP:", error.response?.data || error); // Added detailed logging
+    return res.status(500).json({ msg: "Failed to resend code. Check backend logs." });
   }
 };

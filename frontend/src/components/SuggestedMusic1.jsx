@@ -3,18 +3,7 @@ import { Play, Pause, Disc, Music, BarChart2, Globe, Clock, TrendingUp } from "l
 import { motion, AnimatePresence } from "framer-motion";
 import { useMusic } from "../context/MusicContext"; 
 
-const PremiumStyles = () => (
-  <style>
-    {`
-      @keyframes equalizer-mini { 0% { height: 20%; } 50% { height: 100%; } 100% { height: 20%; } }
-      .bar-mini { width: 3px; background: #a855f7; animation: equalizer-mini 0.8s infinite ease-in-out; border-radius: 2px; }
-      .glass-card-mini { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px); transition: all 0.3s ease; }
-      .glass-card-mini:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(168, 85, 247, 0.3); transform: translateY(-4px); }
-    `}
-  </style>
-);
-
-const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
+const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentQuery, setCurrentQuery] = useState("");
@@ -23,7 +12,7 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
   const { playTrack, currentTrack, isPlaying, setTracks } = useMusic();
 
   // --- 1. ENHANCED SMART QUERY ENGINE ---
-  const generateSmartQuery = (mood, intensity, history) => {
+  const generateSmartQuery = (mood, label, history) => {
       let queryParts = [];
       let typeInfo = { icon: <Music size={12}/>, label: "Standard" };
 
@@ -31,12 +20,12 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
       queryParts.push(mood);
 
       // B. Intensity Modifiers
-      if (intensity > 0.8) {
+      if (label === 'High') {
           if (mood === 'happy') queryParts.push("party dance high energy");
           if (mood === 'sad') queryParts.push("screaming emotional rock");
           if (mood === 'angry') queryParts.push("heavy metal workout");
           if (mood === 'neutral') queryParts.push("focus trance fast");
-      } else if (intensity < 0.5) {
+      } else if (label === 'Low') {
           if (mood === 'happy') queryParts.push("acoustic chill morning");
           if (mood === 'sad') queryParts.push("slow piano melancholic");
           if (mood === 'angry') queryParts.push("meditation calm peaceful");
@@ -80,7 +69,7 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
       setLoading(true);
       
       // Generate Query
-      const { query, type } = generateSmartQuery(mood, intensity, historyBias);
+      const { query, type } = generateSmartQuery(mood, intensityLabel, historyBias);
       setCurrentQuery(query);
       setQueryType(type);
 
@@ -100,7 +89,7 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
     };
 
     fetchSongs();
-  }, [mood, intensity]); 
+  }, [mood, intensityLabel]); 
 
   const handlePlaySong = (track) => {
     setTracks(songs); 
@@ -109,7 +98,6 @@ const SuggestedMusic1 = ({ mood, intensity, historyBias }) => {
 
   return (
     <div className="w-full">
-      <PremiumStyles />
       
       {/* Algorithm Info Bar */}
       <div className="flex items-center justify-between mb-4 px-1">

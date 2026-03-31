@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { FaSearch, FaHistory, FaRobot, FaFingerprint } from "react-icons/fa";
 import { motion } from "framer-motion";
 import axios from "axios";
@@ -6,55 +6,37 @@ import { Link, useNavigate } from "react-router-dom";
 import SuggestedMusic from "./SuggestedMusic";
 
 // --- Custom Fonts & Styles Injection ---
-const FontStyles = () => (
-  <style>
-    {`
-      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Space+Grotesk:wght@300;500;700&display=swap');
+// --- Hero Mouse Parallax Throttling ---
+const useMouseParallax = () => {
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+    const rafRef = useRef(null);
+  
+    useEffect(() => {
+      const handleMouseMove = (e) => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        
+        rafRef.current = requestAnimationFrame(() => {
+          setMousePosition({
+            x: (e.clientX / window.innerWidth) * 20,
+            y: (e.clientY / window.innerHeight) * 20,
+          });
+        });
+      };
       
-      .font-heading { font-family: 'Space Grotesk', sans-serif; }
-      .font-body { font-family: 'Outfit', sans-serif; }
-      
-      .glass-panel {
-        background: rgba(20, 20, 20, 0.4);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-      }
-      
-      .glass-search {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-      }
-
-      .premium-gradient-text {
-        background: linear-gradient(135deg, #e879f9 0%, #a855f7 50%, #6366f1 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-
-      /* Custom Scrollbar for History */
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.02);
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: rgba(168, 85, 247, 0.5);
-      }
-    `}
-  </style>
-);
+      window.addEventListener("mousemove", handleMouseMove, { passive: true });
+      return () => {
+        window.removeEventListener("mousemove", handleMouseMove);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      };
+    }, []);
+  
+    return mousePosition;
+  };
 
 const Dashboard = () => {
   const [moodHistory, setMoodHistory] = useState([]);
   const [lastMood, setLastMood] = useState(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const mousePosition = useMouseParallax();
   const [user, setUser] = useState(null);
   
   // New State for Search Functionality
@@ -63,17 +45,6 @@ const Dashboard = () => {
   
   const navigate = useNavigate();
 
-  // Mouse parallax effect
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 20,
-        y: (e.clientY / window.innerHeight) * 20,
-      });
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
 
   // Load User & Mood History
   useEffect(() => {
@@ -117,19 +88,19 @@ const Dashboard = () => {
 
   return (
     <div className="relative min-h-screen bg-[#030303] text-white font-body overflow-x-hidden selection:bg-fuchsia-500 selection:text-white">
-      <FontStyles />
 
       {/* --- Cinematic Background --- */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div 
           animate={{ x: mousePosition.x * -1, y: mousePosition.y * -1 }}
-          className="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-purple-900/20 rounded-full blur-[150px] mix-blend-screen" 
+          className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[100px] mix-blend-screen" 
         />
         <motion.div 
           animate={{ x: mousePosition.x, y: mousePosition.y }}
-          className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-900/15 rounded-full blur-[150px] mix-blend-screen" 
+          className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-blue-900/15 rounded-full blur-[100px] mix-blend-screen" 
         />
-        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
+        {/* Noise Texture Overlay - FIXED: Using Data URI to avoid 403 Forbidden errors */}
+        <div className="absolute inset-0 opacity-[0.05] translate-z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
       </div>
 
       {/* --- Top Header Bar --- */}
@@ -174,7 +145,7 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="glass-panel p-8 rounded-3xl relative overflow-hidden group"
+            className="glass-panel p-8 rounded-3xl relative overflow-hidden group will-change-transform"
           >
              <div className="absolute top-0 right-0 p-4 opacity-20">
                 <FaRobot size={40} />

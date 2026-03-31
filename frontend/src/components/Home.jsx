@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { FaHeadphones, FaMusic, FaSmile, FaPlay, FaMagic, FaFingerprint, FaPause } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
@@ -10,28 +10,44 @@ import sidhu from "../music/295.mp3";
 import jatt from "../music/Jatt Di Clip 2.mp3";
 import brownMunde from "../music/Paani Paani.mp3"; 
 
-// --- Custom Fonts Injection ---
-const FontStyles = () => (
-  <style>
-    {`
-      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Space+Grotesk:wght@300;500;700&display=swap');
+// --- Hero Mouse Parallax Throttling ---
+const useMouseParallax = () => {
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       
-      .font-heading { font-family: 'Space Grotesk', sans-serif; }
-      .font-body { font-family: 'Outfit', sans-serif; }
-      
-      .premium-gradient-text {
-        background: linear-gradient(135deg, #fff 0%, #a855f7 50%, #ec4899 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-    `}
-  </style>
-);
+      rafRef.current = requestAnimationFrame(() => {
+        setMousePosition({
+          x: (e.clientX / window.innerWidth) * 20,
+          y: (e.clientY / window.innerHeight) * 20,
+        });
+      });
+    };
+    
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  return mousePosition;
+};
 
 const Home = () => {
   const { scrollYProgress } = useScroll();
   const yBg = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const mousePosition = useMouseParallax();
+  const [user, setUser] = useState(null);
+
+  // 1. Check Auth for Hero Actions
+  useEffect(() => {
+    const storedUser = localStorage.getItem("User");
+    if (storedUser) setUser(JSON.parse(storedUser));
+  }, []);
 
   // 2. Destructure Global Music Controls
   const { playTrack, currentTrack, isPlaying, setTracks, togglePlay } = useMusic();
@@ -77,35 +93,23 @@ const Home = () => {
     playTrack(trackObject);
   };
 
-  // Mouse parallax effect for background
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 20,
-        y: (e.clientY / window.innerHeight) * 20,
-      });
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
 
   return (
 
     <div className="relative min-h-screen bg-[#030303] text-white font-body overflow-x-hidden selection:bg-fuchsia-500 selection:text-white">
-      <FontStyles />
 
       {/* --- Cinematic Background --- */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div 
           animate={{ x: mousePosition.x * -1, y: mousePosition.y * -1 }}
-          className="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-purple-900/20 rounded-full blur-[150px] mix-blend-screen" 
+          className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[100px] mix-blend-screen" 
         />
         <motion.div 
           animate={{ x: mousePosition.x, y: mousePosition.y }}
-          className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-pink-900/15 rounded-full blur-[150px] mix-blend-screen" 
+          className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-pink-900/15 rounded-full blur-[100px] mix-blend-screen" 
         />
-        {/* Noise Texture Overlay for "Film Grain" feel */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
+        {/* Noise Texture Overlay for "Film Grain" feel - FIXED: Using Data URI to avoid 403 Forbidden errors */}
+        <div className="absolute inset-0 opacity-[0.02] translate-z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
       </div>
       {/* --- Hero Section --- */}
       <section className="relative z-10 min-h-screen flex flex-col justify-center pt-32 pb-20 px-6 md:px-16 max-w-8xl mx-auto">
@@ -149,12 +153,12 @@ const Home = () => {
               className="flex flex-wrap gap-4"
             >
               <Link
-                to="/login"
+                to={user ? "/FaceScan" : "/login"}
                 className="relative group px-8 py-4 bg-white text-black rounded-full font-heading font-bold overflow-hidden"
               >
                 <div className="absolute inset-0 bg-fuchsia-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                 <span className="relative group-hover:text-white transition-colors flex items-center gap-2">
-                  <FaFingerprint /> Start Scan
+                  <FaFingerprint /> {user ? "Quick Scan" : "Start Scan"}
                 </span>
               </Link>
               
@@ -173,7 +177,7 @@ const Home = () => {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/20 to-purple-500/20 blur-3xl rounded-full opacity-40 animate-pulse" />
             
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] relative overflow-hidden group shadow-2xl">
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-10 rounded-[2.5rem] relative overflow-hidden group shadow-2xl will-change-transform">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               
               <div className="flex justify-between items-start mb-12">
@@ -191,8 +195,11 @@ const Home = () => {
                   <div className="h-[1px] w-full bg-white/10" />
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-500 font-mono">EMOTIFY Live</span>
-                    <button className="text-sm font-bold text-white hover:text-fuchsia-400 transition-colors uppercase tracking-wider" onClick={() => window.location.href = "/login"}>
-                      Start Scan &rarr;
+                    <button 
+                      className="text-sm font-bold text-white hover:text-fuchsia-400 transition-colors uppercase tracking-wider" 
+                      onClick={() => window.location.href = user ? "/FaceScan" : "/login"}
+                    >
+                      {user ? "View Analysis" : "Start Scan"} &rarr;
                     </button>
                   </div>
               </div>

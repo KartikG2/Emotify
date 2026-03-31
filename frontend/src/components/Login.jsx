@@ -59,13 +59,20 @@ export default function Login() {
   const mouseY = useSpring(0, springConfig);
 
   useEffect(() => {
+    // Redirect if already logged in
+    const storedUser = localStorage.getItem("User");
+    if (storedUser) {
+      navigate("/dashboard");
+      return;
+    }
+
     const handleMouseMove = (e) => {
       mouseX.set((e.clientX / window.innerWidth) * 20);
       mouseY.set((e.clientY / window.innerHeight) * 20);
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -122,7 +129,7 @@ export default function Login() {
           style={{ x: mouseX, y: mouseY }}
           className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-fuchsia-900/10 rounded-full blur-[150px]" 
         />
-        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
+        <div className="absolute inset-0 opacity-[0.05] translate-z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
       </div>
 
       <motion.div 

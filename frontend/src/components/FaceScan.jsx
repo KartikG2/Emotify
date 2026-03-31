@@ -7,47 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import SuggestedMusic1 from "./SuggestedMusic1";
 
 // --- Premium Black Styles ---
-const PremiumStyles = () => (
-  <style>
-    {`
-      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Space+Grotesk:wght@300;500;700&display=swap');
-      
-      .font-heading { font-family: 'Space Grotesk', sans-serif; }
-      .font-body { font-family: 'Outfit', sans-serif; }
-      
-      .glass-black {
-        background: rgba(5, 5, 5, 0.9);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-      }
-
-      @keyframes scan-vertical {
-        0% { top: 0%; opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { top: 100%; opacity: 0; }
-      }
-
-      .scan-line {
-        position: absolute;
-        left: 0;
-        width: 100%;
-        height: 3px;
-        background: #a855f7;
-        box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7;
-        animation: scan-vertical 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-      }
-
-      .premium-text-gradient {
-        background: linear-gradient(to right, #ffffff, #c084fc);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-    `}
-  </style>
-);
+const DETECTION_OPTIONS = new faceapi.TinyFaceDetectorOptions();
 
 const FaceScan = () => {
   const videoRef = useRef(null);
@@ -64,6 +24,7 @@ const FaceScan = () => {
   
   // Rate Limiting Refs
   const lastUpdateRef = useRef(0);
+  const moodDataRef = useRef({ mood: null, label: "Scanning..." });
   
   const { user } = useAuth();
 
@@ -134,7 +95,7 @@ const FaceScan = () => {
         if (isPaused) return;
 
         const result = await faceapi
-          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+          .detectSingleFace(videoRef.current, DETECTION_OPTIONS)
           .withFaceExpressions();
 
         if (result?.expressions) {
@@ -152,28 +113,28 @@ const FaceScan = () => {
           const now = Date.now();
           
           // --- STRICT THROTTLING ---
-          // 1. Must be at least 5 seconds since last update
-          // 2. AND (Mood must change OR Intensity Category must change)
-          // This prevents API calls just because confidence went from 0.91 to 0.92
           const timeElapsed = now - lastUpdateRef.current;
-          const isDifferentMood = moodData.mood !== currentMood;
-          const isDifferentIntensity = moodData.label !== intensityLabel;
+          const isDifferentMood = moodDataRef.current.mood !== currentMood;
+          const isDifferentIntensity = moodDataRef.current.label !== intensityLabel;
 
           if (timeElapsed > 5000 && (isDifferentMood || isDifferentIntensity)) {
              
              lastUpdateRef.current = now;
              
-             setMoodData({
+             const nextState = {
                 mood: currentMood,
                 intensity: confidence,
                 label: intensityLabel
-             });
+             };
+
+             moodDataRef.current = nextState;
+             setMoodData(nextState);
 
              // Background Save
              saveExpressionToDB(currentMood);
           }
         }
-      }, 500); // Check every 500ms
+      }, 1000); // Check every 1000ms (Optimized from 500ms)
     };
 
     const video = videoRef.current;
@@ -187,7 +148,7 @@ const FaceScan = () => {
       if (video) video.removeEventListener("playing", runDetection);
       clearInterval(intervalRef.current);
     };
-  }, [loadingModels, cameraError, isPaused, moodData.mood, moodData.label]); // Add isPaused and label to deps
+  }, [loadingModels, cameraError, isPaused]); // Removed moodData dependencies
 
   const saveExpressionToDB = async (mood) => {
     if (!user?.email) return;
@@ -202,7 +163,6 @@ const FaceScan = () => {
 
   return (
     <div className="min-h-screen bg-black text-white font-body pt-24 pb-20 px-4 md:px-6">
-      <PremiumStyles />
       
       <div className="fixed inset-0 z-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
 
@@ -335,7 +295,7 @@ const FaceScan = () => {
                 {moodData.mood && (
                    <SuggestedMusic1 
                       mood={moodData.mood} 
-                      intensity={moodData.intensity} 
+                      intensityLabel={moodData.label} 
                       historyBias={dominantHistory} 
                    />
                 )}

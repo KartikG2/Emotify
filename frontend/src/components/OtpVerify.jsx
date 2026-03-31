@@ -121,14 +121,29 @@ const OTPVerify = () => {
     }
 
     try {
-      await axios.post(
+      const res = await axios.post(
         "https://emotify-r0ms.onrender.com/user/verify-otp",
         { email: signupData.email, otp: otpCode },
         { withCredentials: true }
       );
+
+      const { user, token } = res.data;
+
+      // 1. Set Success State
       setStatus("success");
+      setSuccessMessage("Verified! Logging you in...");
+
+      // 2. Save Session Data
+      localStorage.setItem("token", token);
+      localStorage.setItem("User", JSON.stringify(user));
       localStorage.removeItem("UserData"); 
-      setTimeout(() => navigate("/login"), 1500);
+
+      // 3. Notify App (Navbar)
+      window.dispatchEvent(new Event("storage"));
+
+      // 4. Redirect to Dashboard
+      setTimeout(() => navigate("/dashboard"), 1500);
+
     } catch (error) {
       setStatus("error");
       setErrorMessage(error.response?.data?.msg || "Verification failed.");
@@ -165,7 +180,7 @@ const OTPVerify = () => {
       <div className="fixed inset-0 pointer-events-none">
         <motion.div animate={{ x: mousePos.x * -1, y: mousePos.y * -1 }} className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[150px]" />
         <motion.div animate={{ x: mousePos.x, y: mousePos.y }} className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-[150px]" />
-        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }}></div>
+        <div className="absolute inset-0 opacity-[0.05] translate-z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
       </div>
 
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative z-10 w-full max-w-md px-6">
