@@ -50,8 +50,9 @@ export const MusicProvider = ({ children }) => {
     
     isFetchingRef.current = true;
     try {
+      // FIXED: Using backend proxy to avoid production CORS errors
       const res = await fetch(
-        `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${query}&type=track`
+        `https://emotify-r0ms.onrender.com/Music/search?q=${query}`
       );
 
       // 4. API LIMIT CHECK

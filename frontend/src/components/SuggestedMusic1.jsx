@@ -74,8 +74,9 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
       setQueryType(type);
 
       try {
+        // FIXED: Using backend proxy to bypass CORS
         const res = await fetch(
-          `https://v1.nocodeapi.com/kartikg1/spotify/QuJcgYtQlsFOiwcQ/search?q=${encodeURIComponent(query)}&type=track`
+          `https://emotify-r0ms.onrender.com/Music/search?q=${encodeURIComponent(query)}`
         );
         const data = await res.json();
         // Filter for valid preview URLs and limit results
