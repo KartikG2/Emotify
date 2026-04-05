@@ -36,7 +36,7 @@ const Navbar = () => {
 
     // Listen for the custom event dispatched from Login.jsx
     window.addEventListener("storage", checkAuth);
-    
+
     return () => window.removeEventListener("storage", checkAuth);
   }, []);
 
@@ -82,11 +82,11 @@ const Navbar = () => {
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-6 px-4"
       >
-        <nav 
+        <nav
           className={`nav-glass rounded-full px-6 md:px-8 py-3 flex items-center justify-between transition-all duration-300 
           ${isOpen ? 'rounded-2xl w-full max-w-md flex-col gap-4' : 'w-full max-w-3xl'}`}
         >
-          
+
           {/* --- Logo Section --- */}
           <div className="flex items-center justify-between w-full md:w-auto">
             <Link to="/" className="flex items-center gap-2 group" onClick={() => setIsOpen(false)}>
@@ -99,7 +99,7 @@ const Navbar = () => {
             </Link>
 
             {/* Mobile Menu Toggle */}
-            <button 
+            <button
               className="md:hidden text-gray-300 hover:text-white focus:outline-none"
               onClick={() => setIsOpen(!isOpen)}
             >
@@ -113,15 +113,15 @@ const Navbar = () => {
               const isActive = location.pathname === link.path;
               return (
                 <li key={link.name} className="relative">
-                  <Link 
-                    to={link.path} 
+                  <Link
+                    to={link.path}
                     className={`transition-colors duration-300 hover:text-white ${isActive ? "text-white font-semibold" : ""}`}
                   >
                     {link.name}
                     {isActive && (
-                      <motion.span 
+                      <motion.span
                         layoutId="underline"
-                        className="absolute left-0 -bottom-1 w-full h-[2px] bg-gradient-to-r from-purple-500 to-fuchsia-500" 
+                        className="absolute left-0 -bottom-1 w-full h-[2px] bg-gradient-to-r from-purple-500 to-fuchsia-500"
                       />
                     )}
                   </Link>
@@ -134,23 +134,23 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <div className="flex items-center gap-3">
-                 {/* Username Display (Optional) */}
-                 <span className="text-xs font-bold text-purple-300 hidden lg:block">
-                    Hi, {user.username}
-                 </span>
-                 
-                 {/* Logout Button */}
-                 <button 
-                   onClick={handleLogout}
-                   className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-red-500/10 hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-300 text-xs font-bold text-red-400 uppercase tracking-wider"
-                 >
-                   <LogOut className="w-4 h-4" />
-                 </button>
+                {/* Username Display (Optional) */}
+                <span className="text-xs font-bold text-purple-300 hidden lg:block">
+                  Hi, {user.username}
+                </span>
+
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-red-500/10 hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-300 text-xs font-bold text-red-400 uppercase tracking-wider"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             ) : (
               /* Login Button (Only shows if NO user) */
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-purple-500/50 transition-all duration-300 text-xs font-bold text-white uppercase tracking-wider"
               >
                 <User className="w-4 h-4 text-purple-400" />
@@ -173,9 +173,8 @@ const Navbar = () => {
                     key={link.name}
                     to={link.path}
                     onClick={() => setIsOpen(false)}
-                    className={`text-center py-2 text-sm font-heading tracking-wider hover:bg-white/5 rounded-lg transition-colors ${
-                      location.pathname === link.path ? "text-purple-400 font-bold bg-white/5" : "text-gray-400"
-                    }`}
+                    className={`text-center py-2 text-sm font-heading tracking-wider hover:bg-white/5 rounded-lg transition-colors ${location.pathname === link.path ? "text-purple-400 font-bold bg-white/5" : "text-gray-400"
+                      }`}
                   >
                     {link.name}
                   </Link>
@@ -183,16 +182,16 @@ const Navbar = () => {
 
                 {/* Mobile Login/Logout */}
                 {user ? (
-                  <button 
+                  <button
                     onClick={handleLogout}
                     className="w-full py-3 mt-2 bg-red-500/10 border border-red-500/20 rounded-xl text-center text-red-400 font-bold text-sm"
                   >
                     Logout
                   </button>
                 ) : (
-                  <Link 
+                  <Link
                     to="/login"
-                    onClick={() => setIsOpen(false)} 
+                    onClick={() => setIsOpen(false)}
                     className="w-full py-3 mt-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-xl text-center text-white font-bold text-sm"
                   >
                     Login Account

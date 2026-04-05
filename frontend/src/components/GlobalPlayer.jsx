@@ -1,12 +1,17 @@
-import React from "react";
-import { Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import React, { useState } from "react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMusic } from "../context/MusicContext";
+import ProgressBar from "./ProgressBar";
+import MusicDetailsOverlay from "./MusicDetailsOverlay";
 
 export default function GlobalPlayer() {
   const { currentTrack, isPlaying, togglePlay, nextTrack, prevTrack } = useMusic();
+  const [showDetails, setShowDetails] = useState(false);
 
   return (
+    <>
+    <MusicDetailsOverlay isOpen={showDetails} onClose={() => setShowDetails(false)} />
     <AnimatePresence>
       {currentTrack && (
         <motion.div
@@ -18,7 +23,7 @@ export default function GlobalPlayer() {
           <div className="pointer-events-auto max-w-5xl mx-auto bg-black/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-3 shadow-2xl flex items-center justify-between gap-4">
             
             {/* Left: Song Info */}
-            <div className="flex items-center gap-4 min-w-0 flex-1">
+            <div className="flex items-center gap-4 min-w-0 flex-1 cursor-pointer group" onClick={() => setShowDetails(true)}>
               <div className="relative w-14 h-14 shrink-0">
                 <img 
                     src={currentTrack.album.images[0]?.url} 
@@ -26,43 +31,63 @@ export default function GlobalPlayer() {
                     className="w-full h-full rounded-full object-cover animate-[spin_8s_linear_infinite]" 
                     style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
                 />
-                <div className="absolute inset-0 rounded-full border border-white/10" />
+                <div className="absolute inset-0 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity bg-black/40">
+                  <Maximize2 size={16} className="text-white" />
+                </div>
               </div>
-              <div className="min-w-0 overflow-hidden">
-                <h4 className="text-white font-bold truncate text-sm sm:text-base">{currentTrack.name}</h4>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <h4 className="text-white font-bold truncate text-sm sm:text-base group-hover:text-purple-400 transition-colors">{currentTrack.name}</h4>
                 <p className="text-xs text-gray-400 truncate">{currentTrack.artists[0]?.name}</p>
               </div>
             </div>
 
-            {/* Center: Controls */}
-            <div className="flex items-center gap-4 shrink-0">
-              <button onClick={prevTrack} className="text-gray-400 hover:text-white transition-colors">
-                <SkipBack size={20} />
-              </button>
-              
-              <button 
-                onClick={togglePlay} 
-                className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black hover:scale-105 transition-transform shadow-lg shadow-purple-500/20"
-              >
-                {isPlaying ? <Pause fill="black" size={20} /> : <Play fill="black" className="ml-1" size={20} />}
-              </button>
-              
-              <button onClick={nextTrack} className="text-gray-400 hover:text-white transition-colors">
-                <SkipForward size={20} />
-              </button>
+            {/* Center: Controls & Progress */}
+            <div className="flex items-center flex-col gap-2 flex-[2] shrink-0">
+              <div className="flex items-center gap-6">
+                <button onClick={prevTrack} className="text-gray-400 hover:text-white transition-colors">
+                  <SkipBack size={20} />
+                </button>
+                <button 
+                  onClick={togglePlay} 
+                  className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black hover:scale-105 transition-transform shadow-lg shadow-purple-500/20"
+                >
+                  {isPlaying ? <Pause fill="black" size={20} /> : <Play fill="black" className="ml-1" size={20} />}
+                </button>
+                <button onClick={nextTrack} className="text-gray-400 hover:text-white transition-colors">
+                  <SkipForward size={20} />
+                </button>
+              </div>
+              <div className="w-full max-w-md hidden md:block pointer-events-auto">
+                 <ProgressBar />
+              </div>
             </div>
 
-            {/* Right: Visual (Hidden on mobile) */}
-            <div className="hidden sm:flex items-center gap-2 text-gray-400 shrink-0">
-               <Volume2 size={16} />
-               <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-white w-2/3" />
+            {/* Right: Visual */}
+            <div className="hidden sm:flex items-center gap-4 text-gray-400 shrink-0 flex-1 justify-end">
+               <button 
+                  onClick={() => setShowDetails(true)} 
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white pointer-events-auto"
+                  title="Lyrics & Details"
+               >
+                 <Maximize2 size={18} />
+               </button>
+               <div className="flex items-center gap-2">
+                 <Volume2 size={16} />
+                 <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-white w-2/3" />
+                 </div>
                </div>
             </div>
 
           </div>
+
+          {/* Mobile Seek Bar */}
+          <div className="w-full mt-3 sm:hidden pointer-events-auto px-2">
+            <ProgressBar />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }

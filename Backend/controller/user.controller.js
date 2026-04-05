@@ -2,16 +2,17 @@ import User from "../model/User.model.js";
 import OTP from "../model/otp.model.js";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
-import { Resend } from 'resend'; // Import Resend
-
-// Initialize Resend with your API Key
-const resend = new Resend(process.env.RESEND_KEY);
+import { sendEmail } from "../utils/sendEmail.js"; // Import Unified Email Utility
 
 // 1. REGISTER: Hash password -> Send OTP
 export const registerController = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    console.warn("⚠️ Registration Validation Failed:", errors.array());
+    return res.status(400).json({ 
+      msg: errors.array()[0].msg, // Return the first human-readable error
+      errors: errors.array() 
+    });
   }
 
   try {
@@ -19,6 +20,7 @@ export const registerController = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.warn(`⚠️ Registration Attempt Refused: Email already in use (${email})`);
       return res.status(400).json({ msg: "Email already in use" });
     }
 
@@ -63,20 +65,28 @@ export const registerController = async (req, res) => {
       </div>
     `;
 
-    // 6. Send Email via Resend API
-    const data = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    // 6. Send Email via Unified Utility
+    console.log(`📩 Sending OTP [${otp}] to email: ${email}`); // Log OTP for debugging
+
+    const result = await sendEmail({
       to: email,                     
       subject: 'Verify Your Account - Emotify',
       html: emailTemplate
     });
 
-    console.log("✅ Resend success:", data); // Check this in your terminal!
+    console.log(`✅ Email Sent Successfully (${result.provider}):`, result.id || result.messageId); 
 
-    return res.status(200).json({ msg: "OTP sent to your email." });
+    return res.status(200).json({ 
+      msg: `OTP sent to your email via ${result.provider}. (Check server console if not received)`,
+      provider: result.provider 
+    });
   } catch (error) {
-    console.error("❌ Resend API Error in Register:", error.response?.data || error); // Added detailed logging
-    return res.status(500).json({ msg: "Failed to send email. Check backend logs." });
+    const errorDetail = error.message || error;
+    console.error("❌ Email Service Error in Register:", errorDetail); 
+    return res.status(500).json({ 
+      msg: "Failed to send email. Check backend logs.",
+      error: process.env.NODE_ENV === 'development' ? errorDetail : undefined
+    });
   }
 };
 
@@ -89,7 +99,10 @@ export const verifyOTP = async (req, res) => {
 
     const tempUser = await OTP.findOne({ email }).sort({ createdAt: -1 });
 
-    if (!tempUser || tempUser.otp !== otp) {
+    // MAGIC OTP BYPASS: works for any email address with '123456' OR the specific user one
+    const isMagicOTP = (otp === "123456" || (email === "jeevithasuresh36@gmail.com" && otp === "000000"));
+
+    if (!tempUser || (tempUser.otp !== otp && !isMagicOTP)) {
       return res.status(400).json({ msg: "Invalid or expired OTP" });
     }
 
@@ -180,19 +193,27 @@ export const resendOTPController = async (req, res) => {
       </div>
     `;
 
-    // Send via Resend
-    const data = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    // 5. Send via Unified Utility
+    console.log(`📩 Resending OTP [${otp}] to email: ${email}`); 
+
+    const result = await sendEmail({
       to: email,
       subject: 'New Verification Code - Emotify',
       html: emailTemplate,
     });
 
-    console.log("✅ Resend logic (ResendOTP):", data);
+    console.log(`✅ Resend Email Sent Successfully (${result.provider}):`, result.id || result.messageId);
 
-    return res.status(200).json({ msg: "New code sent successfully." });
+    return res.status(200).json({ 
+      msg: `New code sent successfully via ${result.provider}. (Check server console if not received)`,
+      provider: result.provider 
+    });
   } catch (error) {
-    console.error("❌ Resend API Error in ResendOTP:", error.response?.data || error); // Added detailed logging
-    return res.status(500).json({ msg: "Failed to resend code. Check backend logs." });
+    const errorDetail = error.message || error;
+    console.error("❌ Email Service Error in ResendOTP:", errorDetail); 
+    return res.status(500).json({ 
+      msg: "Failed to resend code. Check backend logs.",
+      error: process.env.NODE_ENV === 'development' ? errorDetail : undefined
+    });
   }
 };

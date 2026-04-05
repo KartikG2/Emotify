@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaShieldAlt, FaArrowRight, FaCheckCircle, FaExclamationCircle, FaRedoAlt } from "react-icons/fa";
 import { Loader2 } from "lucide-react";
@@ -50,14 +50,13 @@ const OTPVerify = () => {
   const [otp, setOtp] = useState(new Array(6).fill(""));
   const [status, setStatus] = useState("idle"); 
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState(""); // New success state
+  const [successMessage, setSuccessMessage] = useState(""); 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [timer, setTimer] = useState(30); // 30s Countdown for Resend
+  const [timer, setTimer] = useState(30); 
   
   const navigate = useNavigate();
   const inputRefs = useRef([]);
 
-  // --- Countdown Logic ---
   useEffect(() => {
     let interval;
     if (timer > 0) {
@@ -66,7 +65,6 @@ const OTPVerify = () => {
     return () => clearInterval(interval);
   }, [timer]);
 
-  // --- Mouse Parallax Effect ---
   useEffect(() => {
     const mouseMoveHandler = (e) => {
       setMousePos({ 
@@ -103,7 +101,6 @@ const OTPVerify = () => {
     }
   };
 
-  // --- Verify Logic ---
   const handleVerify = async () => {
     const otpCode = otp.join("");
     if (otpCode.length < 6) {
@@ -121,27 +118,20 @@ const OTPVerify = () => {
     }
 
     try {
-      const res = await axios.post(
-        "https://emotify-r0ms.onrender.com/user/verify-otp",
-        { email: signupData.email, otp: otpCode },
-        { withCredentials: true }
-      );
+      const res = await api.post("/user/verify-otp", { 
+        email: signupData.email, 
+        otp: otpCode 
+      });
 
       const { user, token } = res.data;
-
-      // 1. Set Success State
       setStatus("success");
       setSuccessMessage("Verified! Logging you in...");
 
-      // 2. Save Session Data
       localStorage.setItem("token", token);
       localStorage.setItem("User", JSON.stringify(user));
       localStorage.removeItem("UserData"); 
 
-      // 3. Notify App (Navbar)
       window.dispatchEvent(new Event("storage"));
-
-      // 4. Redirect to Dashboard
       setTimeout(() => navigate("/dashboard"), 1500);
 
     } catch (error) {
@@ -152,7 +142,6 @@ const OTPVerify = () => {
     }
   };
 
-  // --- Resend Logic (New) ---
   const handleResend = async () => {
     setErrorMessage("");
     setSuccessMessage("");
@@ -164,10 +153,8 @@ const OTPVerify = () => {
     }
 
     try {
-      await axios.post("https://emotify-r0ms.onrender.com/user/resend-otp", { 
-        email: signupData.email 
-      });
-      setTimer(60); // Reset timer to 60s
+      await api.post("/user/resend-otp", { email: signupData.email });
+      setTimer(60); 
       setSuccessMessage("New code sent! Check your inbox.");
     } catch (error) {
       setErrorMessage(error.response?.data?.msg || "Failed to resend code.");
@@ -216,21 +203,17 @@ const OTPVerify = () => {
             {status === "loading" ? <><Loader2 className="animate-spin" /> Verifying...</> : status === "success" ? <><FaCheckCircle /> Verified</> : <>Verify & Proceed <FaArrowRight /></>}
           </button>
 
-          {/* Messages */}
-          <AnimatePresence>
-            {errorMessage && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center gap-2 text-red-400 text-xs font-medium">
-                <FaExclamationCircle /> {errorMessage}
-              </motion.div>
-            )}
-            {successMessage && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center gap-2 text-green-400 text-xs font-medium">
-                <FaCheckCircle /> {successMessage}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {errorMessage && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center gap-2 text-red-400 text-xs font-medium">
+              <FaExclamationCircle /> {errorMessage}
+            </div>
+          )}
+          {successMessage && (
+            <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center gap-2 text-green-400 text-xs font-medium">
+              <FaCheckCircle /> {successMessage}
+            </div>
+          )}
 
-          {/* Resend Section with Timer */}
           <div className="mt-8 text-center">
              <p className="text-xs text-gray-500 flex flex-col items-center gap-2">
                Didn't receive the code?

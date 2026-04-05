@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Play, Pause, Disc, Music, BarChart2, Globe, Clock, TrendingUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import api from "../api/api"; // Import Unified API Utility
 import { useMusic } from "../context/MusicContext"; 
 
 const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
@@ -33,33 +34,23 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
       }
 
       // C. DISCOVERY ENGINE (The "Secret Sauce")
-      // Randomly inject Flavor: 40% Trending, 30% Nostalgia, 30% Regional
       const roll = Math.random();
-
       if (roll < 0.4) {
-          // TRENDING (40% Chance)
           queryParts.push("viral top 50 2024");
           typeInfo = { icon: <TrendingUp size={12} className="text-green-400" />, label: "Trending Now" };
       } else if (roll < 0.7) {
-          // NOSTALGIA / OLD SONGS (30% Chance)
           const decades = ["90s", "2000s", "80s classic"];
           const randomDecade = decades[Math.floor(Math.random() * decades.length)];
           queryParts.push(`${randomDecade} hits`);
           typeInfo = { icon: <Clock size={12} className="text-yellow-400" />, label: `Retro ${randomDecade}` };
       } else {
-          // LANGUAGE / REGIONAL (30% Chance)
-          // Add more languages here if you want
           const langs = ["Bollywood Hindi", "Punjabi", "Tollywood", "English Global","kannada","Tamil","Telugu","Hollywood","marathi","bengali","Malayalam","Spanish","French","Italian","German","Japanese","Korean"];
           const randomLang = langs[Math.floor(Math.random() * langs.length)];
           queryParts.push(randomLang);
           typeInfo = { icon: <Globe size={12} className="text-blue-400" />, label: `${randomLang} Mix` };
       }
 
-      // D. History Injection
-      if (history) {
-         queryParts.push(history);
-      }
-      
+      if (history) queryParts.push(history);
       return { query: queryParts.join(" "), type: typeInfo };
   };
 
@@ -68,19 +59,14 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
       if (!mood) return;
       setLoading(true);
       
-      // Generate Query
       const { query, type } = generateSmartQuery(mood, intensityLabel, historyBias);
       setCurrentQuery(query);
       setQueryType(type);
 
       try {
-        // FIXED: Using backend proxy to bypass CORS
-        const res = await fetch(
-          `https://emotify-r0ms.onrender.com/Music/search?q=${encodeURIComponent(query)}`
-        );
-        const data = await res.json();
-        // Filter for valid preview URLs and limit results
-        const validSongs = (data.tracks?.items || []).filter(track => track.preview_url).slice(0, 8); 
+        // FIXED: Using unified api utility instead of raw fetch
+        const res = await api.get(`/Music/search?q=${encodeURIComponent(query)}`);
+        const validSongs = (res.data.tracks?.items || []).filter(track => track.preview_url).slice(0, 8); 
         setSongs(validSongs);
       } catch (err) {
         console.error("Error fetching songs:", err);
@@ -90,7 +76,7 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
     };
 
     fetchSongs();
-  }, [mood, intensityLabel]); 
+  }, [mood, intensityLabel, historyBias]);
 
   const handlePlaySong = (track) => {
     setTracks(songs); 
@@ -99,13 +85,11 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
 
   return (
     <div className="w-full">
-      
-      {/* Algorithm Info Bar */}
       <div className="flex items-center justify-between mb-4 px-1">
-         <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono uppercase truncate max-w-[70%]">
+         <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono uppercase truncate max-w-[70%] text-wrap">
             <BarChart2 size={12} /> Query: "{currentQuery}"
          </div>
-         <div className="flex items-center gap-2 text-[10px] text-white bg-white/10 px-2 py-1 rounded-full border border-white/5">
+         <div className="flex items-center gap-2 text-[10px] text-white bg-white/10 px-2 py-1 rounded-full border border-white/5 whitespace-nowrap">
             {queryType.icon} {queryType.label}
          </div>
       </div>
@@ -124,18 +108,8 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
           <AnimatePresence mode="wait">
             {songs.map((track, index) => {
               const isActive = currentTrack?.preview_url === track.preview_url && isPlaying;
-
               return (
-                <motion.div
-                  key={track.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`glass-card-mini p-2 rounded-xl flex items-center gap-3 cursor-pointer group ${
-                    isActive ? "bg-purple-500/10 border-purple-500/30" : ""
-                  }`}
-                  onClick={() => handlePlaySong(track)}
-                >
+                <motion.div key={track.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.05 }} className={`p-2 rounded-xl flex items-center gap-3 cursor-pointer group ${isActive ? "bg-purple-500/10 border border-purple-500/30" : "border border-transparent hover:bg-white/5"}`} onClick={() => handlePlaySong(track)}>
                   <div className="relative w-10 h-10 flex-shrink-0">
                     <img src={track.album.images[0]?.url} alt={track.name} className="w-full h-full object-cover rounded-lg" />
                     {isActive && (
@@ -148,25 +122,16 @@ const SuggestedMusic1 = ({ mood, intensityLabel, historyBias }) => {
                         </div>
                     )}
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-sm font-bold truncate ${isActive ? "text-purple-400" : "text-white"}`}>{track.name}</h4>
                     <p className="text-[10px] text-gray-400 truncate">{track.artists[0].name}</p>
                   </div>
-                  
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                     <Play size={14} className="text-white" />
-                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity"><Play size={14} className="text-white" /></div>
                 </motion.div>
               );
             })}
           </AnimatePresence>
-          
-          {songs.length === 0 && !loading && (
-             <div className="text-center py-8 text-gray-500 text-xs">
-                No preview-enabled tracks found for this mood mix.
-             </div>
-          )}
+          {songs.length === 0 && !loading && (<div className="text-center py-8 text-gray-500 text-xs">No preview-enabled tracks found for this mood mix.</div>)}
         </div>
       )}
     </div>

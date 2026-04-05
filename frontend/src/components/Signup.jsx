@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api/api";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUser, FaEnvelope, FaLock, FaArrowRight, FaMusic } from "react-icons/fa";
@@ -80,10 +80,9 @@ export default function Signup() {
     setStatus("loading");
 
     try {
-      await axios.post(
-        "https://emotify-r0ms.onrender.com/user/register",
-        formData,
-        { withCredentials: true }
+      await api.post(
+        "/user/register",
+        formData
       );
 
       setStatus("success");
@@ -97,7 +96,10 @@ export default function Signup() {
     } catch (err) {
       console.error("Signup error:", err);
       setStatus("error");
-      setErrorMessage(err.response?.data?.message || "Registration failed. Please try again.");
+      
+      // FIXED: Backend returns errors in .msg field
+      const serverError = err.response?.data?.msg || "Registration failed. Please try again.";
+      setErrorMessage(serverError);
     }
   };
 

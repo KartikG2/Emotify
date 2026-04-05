@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState, useContext } from "react";
+import React, { createContext, useEffect, useState, useContext, useCallback, useMemo } from "react";
 
 export const AuthContext = createContext();
 
@@ -19,22 +19,30 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ✅ Centralized Login Function
-  const login = (userData, token) => {
+  // ✅ Centralized Login Function - Stable Identity
+  const login = useCallback((userData, token) => {
     localStorage.setItem("User", JSON.stringify(userData));
     localStorage.setItem("token", token);
     setUser(userData); // Updates state immediately
-  };
+  }, []);
 
-  // ✅ Centralized Logout Function
-  const logout = () => {
+  // ✅ Centralized Logout Function - Stable Identity
+  const logout = useCallback(() => {
     localStorage.removeItem("User");
     localStorage.removeItem("token");
     setUser(null);
-  };
+  }, []);
+
+  // ✅ Memoize Provider Value to prevent child re-renders
+  const value = useMemo(() => ({
+    user,
+    login,
+    logout,
+    loading
+  }), [user, login, logout, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

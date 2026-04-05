@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/api";
 import { motion, AnimatePresence, useSpring } from "framer-motion";
 import { Loader2, Mail, Lock, ArrowRight, LogIn } from "lucide-react";
-// import { useAuth } from "../context/AuthProvider"; 
 
 // --- Premium Styles ---
 const PremiumStyles = () => (
@@ -47,8 +46,6 @@ const PremiumStyles = () => (
 
 export default function Login() {
   const navigate = useNavigate();
-  // const { login } = useAuth(); 
-  
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [status, setStatus] = useState("idle"); 
   const [errorMessage, setErrorMessage] = useState("");
@@ -72,7 +69,7 @@ export default function Login() {
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY, navigate]);
+  }, [navigate]); // Fixed: only run on mount and navigate change
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -85,12 +82,8 @@ export default function Login() {
     setErrorMessage("");
 
     try {
-      // 1. API Call
-      const res = await axios.post(
-        "https://emotify-r0ms.onrender.com/user/login",
-        formData,
-        { withCredentials: true }
-      );
+      // 1. API Call using dynamic api instance
+      const res = await api.post("/user/login", formData);
 
       setStatus("success");
 
@@ -105,7 +98,6 @@ export default function Login() {
 
       // 3. Redirect (FIXED: Using location.href to force re-check of auth state)
       setTimeout(() => {
-        // navigate("/dashboard"); <-- Replaced this
         window.location.href = "/dashboard"; 
       }, 1000);
 
